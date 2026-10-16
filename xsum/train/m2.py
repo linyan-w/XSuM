@@ -237,10 +237,14 @@ def sample_flow(model, C, M, device, n_steps=64, bs=65536):
 def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5):
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    F = pd.read_parquet(f"{table_dir}/features.parquet"); T = pd.read_parquet(f"{table_dir}/targets.parquet"); L = pd.read_parquet(f"{table_dir}/labels.parquet")
+    tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
+    F = pd.read_parquet(f"{table_dir}/features.parquet")
+    T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=tcols).astype(np.float32)
+    L = pd.read_parquet(f"{table_dir}/labels.parquet", columns=["is_signal_cohpi"])
     if max_rows and len(F) > max_rows:
         keep = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, T, L = F.iloc[keep], T.iloc[keep], L.iloc[keep]
-    names = list(F.columns); X = F.to_numpy(np.float32)
+    names = list(F.columns); X = np.ascontiguousarray(F.to_numpy(np.float32))
+    F = F[["vtx_x", "vtx_y"]]          # only the vertex signs are needed later (point-mass values)
     file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
     split = split_by_level(pd.MultiIndex.from_arrays([file_id], names=["file"]), level="file", seed=seed)
     tr, va, te = split["train"], split["val"], split["test"]
@@ -251,11 +255,19 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
 
     # ---- slice cardinality and group presence (GBDT) ---------------------------------------------------------
     heads = {}
-    ncl = np.clip(T.n_matched_slices.to_numpy(), 0, 2)
+    ncl = np.clip(T.n_matched_slices.to_numpy(), 0, 2).astype(int)
     heads["n_matched_slices"] = gbdt(X[tr], ncl[tr], seed)
     Pn = np.zeros((int(te.sum()), 3)); Pn[:, heads["n_matched_slices"].classes_] = heads["n_matched_slices"].predict_proba(X[te])
     metrics["n_matched_slices"] = {"marginal_true": np.bincount(ncl[te], minlength=3).tolist(), "mean_prob": Pn.mean(0).tolist(),
                                    "logloss": float(-np.log(np.clip(Pn[np.arange(len(Pn)), ncl[te]], 1e-9, None)).mean())}
+    # everything below concerns matched slices only: drop the other rows to keep memory within bounds
+    keep = matched
+    F, T, L = F[keep], T[keep], L[keep]
+    X, C = X[keep], C[keep]
+    tr, va, te = tr[keep], va[keep], te[keep]
+    matched = np.ones(len(F), dtype=bool)
+    import gc; gc.collect()
+    print(f"restricted to {len(F)} matched slices", flush=True)
     # topology: joint categorical over the PFP counts, sampled first and fed to every other component
     topo = Topology(T, tr & matched); ktrue = topo.encode(T)
     heads["topology"] = MLPClassifier(C.shape[1], topo.other + 1, device=device, seed=seed).fit(C[tr & matched], ktrue[tr & matched], C[va & matched], ktrue[va & matched])
