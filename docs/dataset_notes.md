@@ -89,9 +89,27 @@ In file 0: 1,882 / 5,830 neutrinos have a matched slice (1,057 / 1,267 in the FV
 
 # The XSuM production (`configs/cafpyana/analysis_village/xsum/`)
 
-Runs on sbndbuild03 from `/pnfs/sbnd/persistent/users/lwan/dataframe/` (shallow clone of
-`sungbinoh/cafpyana` branch `feature/sungbin_technote_plots`, environment `xsum_env.sh`: cvmfs spack
-hdf5/xrootd/root + an existing py3.10 cafpyana venv, no new venv). Tables: `mcnu` (every neutrino, full
+Runs on sbndbuild03 from local disk `/scratch/lwan/xsum/` (shallow clone of `sungbinoh/cafpyana` branch
+`feature/sungbin_technote_plots`, environment `xsum_env.sh`: cvmfs spack hdf5/xrootd/root + an existing
+py3.10 cafpyana venv, no new venv; dCache refuses in-place rewrites, so code, logs and HDF5 outputs never go
+to `/pnfs` directly). Finished dataframes are copied to `/pnfs/sbnd/persistent/users/lwan/dataframe/`.
+`run_chunks.sh` runs 6 `run_df_maker.py` processes with 5 workers each; one merged flat CAF (2.5 GB,
+3,300 events) takes 105 s on an idle core, about 5 min under the 30-worker load; output is 12 MB per merged
+file (3.7 kB per event). Output files `<prefix>_chunkN.df` hold keys `<table>_<k>` per 2 GB split;
+`xsum.io.xsum_df.read_production` concatenates them with a leading `chunk` index level.
+
+Input samples:
+
+- cafpyana sample list `prod_2026/v10_14_02_03/..._flatcaf_sbnd_merged.txt`: 2,996 merged flat CAFs on
+  sungbino's dCache scratch; by 2026-10-16 only 1,633 still existed (scratch is purged). First production
+  uses those (about 5.4 M events, 55 % of the sample).
+- SAM definition `aurora_SBND2026A_gen2_BNBLight_prodgenie_corsika_proton_rockbox0p1_sbnd_CV_v10_14_02_03_flatcaf_sbnd`
+  (sbndpro, 2026-03-02): 749,262 unmerged flat CAFs, 7.9 TB, 9,935,524 events, on
+  `/pnfs/fnal.gov/usr/sbn/data_add/sbn_nd/aurora/mc/v10_14_02_03/...`, xrootd URLs via
+  `samweb list-file-locations --defname=... --schema=root` (SAM host is `samsbnd.fnal.gov`; set
+  `SAM_WEB_HOST`/`SAM_WEB_BASE_URL`, the default `samweb.fnal.gov` does not resolve on sbndbuild03). This is
+  the full official sample for the second production; about 13 events per file, so the per-file overhead
+  dominates (about 2 s per file per worker measured with 5 workers). Tables: `mcnu` (every neutrino, full
 `make_mcdf` truth + cohpi kinematics + `nuint_categ`), `mcprim` (every primary), `slc` (every non-clear-cosmic
 slice with the cohpi variables and selection stages `pass_*` as flags, `pass_cohpi` = full selection incl.
 sphere-charge and cathode-crosser cuts from the notebook, `in_sr` = signal region), `pfp` (every PFP within
