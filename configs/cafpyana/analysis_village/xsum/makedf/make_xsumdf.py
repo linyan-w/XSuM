@@ -186,8 +186,11 @@ def make_xsum_slcdf(f):
         slcdf["range_p_mu"] = g(muondf.pfp.trk.rangeP.p_muon)
         slcdf["range_p_cpi"] = g(cpidf.pfp.trk.rangeP.p_muon)
         slcdf["range_p_cpi_pion"] = g(cpidf.pfp.trk.rangeP.p_pion)
-    else:
-        for c in ["reco_t", "opening_angle", "is_muon_contained", "is_cpi_contained", "range_p_mu", "range_p_cpi", "range_p_cpi_pion"]:
+    # columns that only exist when a two-track slice was found: make sure they are always present
+    for c in (["reco_t", "opening_angle", "is_muon_contained", "is_cpi_contained", "range_p_mu", "range_p_cpi", "range_p_cpi_pion"]
+              + [f"{t}_{e}_{a}" for t in ("muon", "cpi") for e in ("start", "end") for a in ("x", "y", "z")]
+              + [f"{t}_{c}" for t in ("long", "short") for c in ("dirx", "diry", "dirz", "trk_len", "trk_pid", "trk_chi2_mu", "trk_chi2_pro", "trk_chi2_mu_new", "trk_chi2_pro_new", "pfp_index")]):
+        if c not in slcdf.columns:
             slcdf[c] = np.nan
 
     # light: total PE of flashes within +-5 us of the beam
