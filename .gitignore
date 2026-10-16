@@ -1,0 +1,22 @@
+# analysis dataframes and CAFs are GB-sized; never commit them
+*.df
+*.root
+/data/
+# python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.egg-info/
+.venv/
+.pytest_cache/
+# outputs
+runs/
+outputs/
+*.parquet
+*.h5
+*.npz
+*.log
+reports/*/model.pt
+reports/*/train.log
+# internal technotes/papers dropped into the working directory
+*.pdf

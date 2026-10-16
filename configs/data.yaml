@@ -1,0 +1,27 @@
+# Example surrogate dataset (cafpyana cohpi all-weight signal df) and the derived caches.
+source:
+  df: /data/sungbino_home/study/sbnd/cohpi/cafpyana/analysis_village/cohpi/plotting/syst/cohpi_all_weight_signal_mc_no_dirz_cont_var.df
+  keys: [evt, hdr, histgenevtdf, histpotdf, mcnu, pot]
+cache: data/cache            # slimmed Parquet tables written by scripts/slim_cohpi_df.py (not committed)
+# Truth variables available in the example df (per true neutrino, signal only)
+truth:
+  kinematics: [true_E_nu, true_p_mu, true_p_pi, true_cos_theta_mu, true_cos_theta_pi, true_t]
+  category: nuint_categ       # 1 = CC coherent pi+ signal (1mu 1pi 0p 0n 0pi0, in FV); see docs/dataset_notes.md
+# Reconstructed block (per selected slice) modelled by the surrogate
+reco:
+  tier0: [selected]           # derived: a selected slice truth-matched to this neutrino exists
+  tier1:
+    vertex: [vtx_x, vtx_y, vtx_z]
+    tracks: [long_dirx, long_diry, long_dirz, short_dirx, short_diry, short_dirz, long_trk_len, short_trk_len,
+             range_p_mu, range_p_cpi, is_muon_contained, is_cpi_contained,
+             muon_start_x, muon_start_y, muon_start_z, muon_end_x, muon_end_y, muon_end_z,
+             cpi_start_x, cpi_start_y, cpi_start_z, cpi_end_x, cpi_end_y, cpi_end_z]
+    pid: [long_trk_pid, short_trk_pid, long_trk_chi2_mu, long_trk_chi2_pro, long_trk_chi2_mu_new, long_trk_chi2_pro_new,
+          short_trk_chi2_mu, short_trk_chi2_pro, short_trk_chi2_mu_new, short_trk_chi2_pro_new]
+    event: [reco_t, opening_angle, total_pe, nu_score, bcfm_score,
+            sum_integ_1cm, sum_integ_2cm, sum_integ_3cm, sum_integ_4cm, sphere_3_over_4m3]
+  derived_not_modelled: [reco_t, opening_angle, sphere_3_over_4m3]   # functions of other reco columns; recompute, do not generate
+split:
+  by: file_idx                # hold out whole input files, never random rows
+  fractions: [0.8, 0.1, 0.1]
+  seed: 20261016
