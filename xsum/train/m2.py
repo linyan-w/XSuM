@@ -23,18 +23,18 @@ from ..eval.metrics import binary_metrics, sample_vs_real_1d
 from ..models.flow import FlowMatcher
 from .baselines import Standardizer, gbdt
 
-# (column, transform, group). Transforms: lin, log (x>0), log1p (x>=0), logit01 (x in [0,1]).
+# (column, transform, group). Transforms: lin, log (x>0), log1p (x>=0), atanh (x in [-1,1]).
 SPEC = [
     ("vtx_x", "lin", "base"), ("vtx_y", "lin", "base"), ("vtx_z", "lin", "base"),
     ("nu_score", "lin", "base"), ("bcfm_score", "lin", "base"), ("total_pe", "log", "base"),
     ("n_pfp", "lin", "base"), ("n_prong", "lin", "base"), ("n_trk", "lin", "base"), ("n_proton", "lin", "base"), ("n_shower", "lin", "base"),
-    ("long_dirx", "lin", "base"), ("long_diry", "lin", "base"), ("long_dirz", "lin", "base"), ("long_trk_len", "log", "base"),
+    ("long_dirx", "atanh", "base"), ("long_diry", "atanh", "base"), ("long_dirz", "atanh", "base"), ("long_trk_len", "log", "base"),
     ("long_trk_pid", "lin", "base"), ("long_trk_chi2_mu", "log1p", "base"), ("long_trk_chi2_pro", "log1p", "base"),
     ("long_trk_chi2_mu_new", "log1p", "base"), ("long_trk_chi2_pro_new", "log1p", "base"),
-    ("short_dirx", "lin", "short"), ("short_diry", "lin", "short"), ("short_dirz", "lin", "short"), ("short_trk_len", "log", "short"),
+    ("short_dirx", "atanh", "short"), ("short_diry", "atanh", "short"), ("short_dirz", "atanh", "short"), ("short_trk_len", "log", "short"),
     ("short_trk_pid", "lin", "short"), ("short_trk_chi2_mu", "log1p", "short"), ("short_trk_chi2_pro", "log1p", "short"),
     ("short_trk_chi2_mu_new", "log1p", "short"), ("short_trk_chi2_pro_new", "log1p", "short"),
-    ("reco_t", "log", "two"), ("opening_angle", "lin", "two"), ("range_p_mu", "log", "two"), ("range_p_cpi", "log", "two"),
+    ("reco_t", "log", "two"), ("opening_angle", "atanh", "two"), ("range_p_mu", "log", "two"), ("range_p_cpi", "log", "two"),
     ("muon_start_x", "lin", "two"), ("muon_start_y", "lin", "two"), ("muon_start_z", "lin", "two"),
     ("muon_end_x", "lin", "two"), ("muon_end_y", "lin", "two"), ("muon_end_z", "lin", "two"),
     ("cpi_start_x", "lin", "two"), ("cpi_start_y", "lin", "two"), ("cpi_start_z", "lin", "two"),
@@ -46,17 +46,31 @@ FLAGS = ["is_muon_contained", "is_cpi_contained"]   # Bernoulli, defined on the 
 COUNT_COLS = {"n_pfp", "n_prong", "n_trk", "n_proton", "n_shower"}
 
 
+EDGE = 1 - 1e-5
+
+
 def fwd(x, tf):
     x = np.asarray(x, dtype=np.float64)
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
+    if tf == "atanh": return np.arctanh(np.clip(x, -EDGE, EDGE))
     return x
 
 
 def inv(y, tf):
     if tf == "log": return np.exp(y)
-    if tf == "log1p": return np.expm1(y)
+    if tf == "log1p": return np.maximum(np.expm1(y), 0.0)
+    if tf == "atanh": return np.tanh(y)
     return y
+
+
+# point masses at detector / algorithm boundaries: (column, membership test, value given the truth features)
+SPIKES = {
+    "vtx_z": (lambda v: np.abs(v) < 0.5, lambda F: np.zeros(len(F))),
+    "vtx_x": (lambda v: np.abs(v) > 199.5, lambda F: 200.0 * np.sign(F["vtx_x"].to_numpy())),
+    "vtx_y": (lambda v: np.abs(v) > 199.5, lambda F: 200.0 * np.sign(F["vtx_y"].to_numpy())),
+    "opening_angle": (lambda v: v <= -0.999, lambda F: -np.ones(len(F))),
+}
 
 
 class BlockTransform:
@@ -87,9 +101,14 @@ class BlockTransform:
         out = {}
         for j, (c, tf, _) in enumerate(self.spec):
             v = inv(Y[:, j], tf)
-            if c in COUNT_COLS: v = np.rint(v).clip(0)
+            if c in COUNT_COLS: v = np.rint(v).clip(1 if c == "n_pfp" else 0)
             out[c] = np.where(M[:, j] > 0, v, np.nan)
-        return pd.DataFrame(out, index=index)
+        df = pd.DataFrame(out, index=index)
+        for t in ("long", "short"):
+            n = np.sqrt(df[f"{t}_dirx"]**2 + df[f"{t}_diry"]**2 + df[f"{t}_dirz"]**2)
+            for a in ("x", "y", "z"):
+                df[f"{t}_dir{a}"] = df[f"{t}_dir{a}"] / n.where(n > 0, 1.0)
+        return df
 
 
 def presence(T, bt):
@@ -188,6 +207,11 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         y = np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int); m = matched & P["two"]
         heads[fl] = gbdt(X[tr & m], y[tr & m], seed, max_iter=300)
         pres_metrics[fl] = binary_metrics(y[te & m], heads[fl].predict_proba(X[te & m])[:, 1])
+    for c, (test, _) in SPIKES.items():
+        v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
+        m = matched & ok & (P["two"] if c == "opening_angle" else True)
+        heads["spike_" + c] = gbdt(X[tr & m], y[tr & m], seed, max_iter=300)
+        pres_metrics["spike_" + c] = binary_metrics(y[te & m], heads["spike_" + c].predict_proba(X[te & m])[:, 1])
     metrics["presence"] = pres_metrics
     print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
 
@@ -195,6 +219,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     Y = bt.matrix(T); bt.fit(Y[tr & matched])
     Z, Mfin = bt.standardise(Y)
     Mg = mask_from_presence(P, bt) * Mfin          # groups absent or values non-finite are masked
+    Sreal = {}
+    for c, (test, _) in SPIKES.items():
+        j = bt.cols.index(c); v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v)
+        Mg[Sreal[c], j] = 0.0                      # point masses are not modelled by the flow
     model, hist = train_flow(Z[tr & matched], Mg[tr & matched], C[tr & matched], Z[va & matched], Mg[va & matched], C[va & matched], epochs, device, hidden, n_layers, seed=seed)
     metrics["flow_val_curve"] = hist
 
@@ -203,17 +231,24 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     rng = np.random.default_rng(seed)
     Pg = {g: rng.random(int(tm.sum())) < heads[g].predict_proba(X[tm])[:, 1] for g in GROUPS}
     Mgen = mask_from_presence(Pg, bt)
+    Sgen = {}
+    for c, (test, value) in SPIKES.items():
+        j = bt.cols.index(c); p = heads["spike_" + c].predict_proba(X[tm])[:, 1]
+        Sgen[c] = (rng.random(len(p)) < p) & (Mgen[:, j] > 0); Mgen[Sgen[c], j] = 0.0
     Zgen = sample_flow(model, C[tm], Mgen, device)
     gen = bt.frame(Zgen, Mgen, idx)
     real = bt.frame(Z[tm], Mg[tm], idx)           # same transform round trip for a fair comparison
+    Ftm = F[tm]
+    for c, (test, value) in SPIKES.items():
+        gen.loc[Sgen[c], c] = value(Ftm)[Sgen[c]]
+        real.loc[Sreal[c][tm], c] = T[c].to_numpy()[tm][Sreal[c][tm]]
     for fl in FLAGS:
         p = heads[fl].predict_proba(X[tm])[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(len(p)) < p).astype(float), np.nan)
         real[fl] = T[fl].to_numpy()[tm]
     percol = {}
-    for j, (c, tf, g) in enumerate(SPEC):   # compared in transformed (log / lin) units, before the inverse transform
-        ok_r, ok_f = Mg[tm][:, j] > 0, Mgen[:, j] > 0
-        yr, yf = Z[tm][ok_r, j] * bt.mad[j] + bt.med[j], Zgen[ok_f, j] * bt.mad[j] + bt.med[j]
-        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(yr, yf)}
+    for j, (c, tf, g) in enumerate(SPEC):   # compared in transformed units (log / atanh / lin), point masses included
+        r, f = fwd(real[c].to_numpy(), tf), fwd(gen[c].to_numpy(), tf); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
+        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
     metrics["per_column"] = percol
     cf_real, cf_gen = cohpi_cutflow(real), cohpi_cutflow(gen)
     metrics["cohpi_cutflow_test"] = {"real": cf_real, "generated": cf_gen}
@@ -227,7 +262,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     fig, axs = plots.plt.subplots(3, 4, figsize=(14, 9)); axs = axs.ravel()
     for ax, c in zip(axs, show):
         tf = dict((s[0], s[1]) for s in SPEC)[c]
-        r, f = fwd(real[c].dropna(), tf), fwd(gen[c].dropna(), tf)
+        r, f = fwd(real[c].dropna(), tf), fwd(gen[c].dropna(), tf); r, f = r[np.isfinite(r)], f[np.isfinite(f)]
         lo, hi = np.percentile(np.concatenate([r, f]), [0.5, 99.5])
         plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
     plots.save(fig, out / "figures" / "m2_marginals.png")
