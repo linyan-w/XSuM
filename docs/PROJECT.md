@@ -149,3 +149,10 @@ dCache, `root://fndcadoor.fnal.gov`), the v10_14_02_03 BNB + cosmics CV producti
 
 - 2026-10-16: package name `xsum`; truth → reco direction is `mcnu` → `evt`; splits by `file_idx`;
   generator-internal labels are never inputs; the example df is used only for M0–M2.
+- 2026-10-16: scope fixed. XSuM generates, per true neutrino, the complete cafpyana reconstruction record
+  (the `slc` row incl. hit-level quantities such as `total_pe` and the sphere charges, and the `pfp` set) in
+  the same dataframe format as the production. Analysis selections are not modelled; they are recomputed from
+  the generated variables by the analysers (cohpi: S. Oh, kaon: T. Wester), who compare the surrogated sample
+  with the real chain. The technotes (`docs/analysis_notes.md`) serve only to know which variables matter and
+  to sanity-check the production. Slice cardinality per neutrino (0, 1, several matched slices) is a target;
+  cosmic-only slices are independent of the neutrino model and are reused from the MC.
