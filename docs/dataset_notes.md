@@ -135,6 +135,9 @@ python run_df_maker.py -c analysis_village/xsum/configs/xsum_surrogate.py -l lis
 
 Each job copies its ~375 flat CAFs with xrdcp, builds the cafpyana venv on the node, runs single-threaded and
 writes `<out>_<job>.df` to `$CAFPYANA_GRID_OUT_DIR/dfs/<timestamp>__<out>/`. Pilot: one job over 375 files
-(cluster 72523085, 2026-10-16 09:25). Memory note: the merged-file test of the extended module peaked at
+(cluster 72523085, 2026-10-16 09:25): about 10 min of setup on the node, then 21.5 s per file single-threaded
+(2 h 14 min for 375 files, 41.5 MB output, 4,863 events); so the full definition is about 4,500 CPU-hours.
+Full submission: 2,000 jobs over the 748,887 remaining files (the pilot's 375 excluded; its output is part of
+the dataset), 2026-10-16 12:05. Memory note: the merged-file test of the extended module peaked at
 19 GB RSS (true-particle table + calo update of every PFP of 3,300 events); official files (13 events) need
 well under 1 GB.
