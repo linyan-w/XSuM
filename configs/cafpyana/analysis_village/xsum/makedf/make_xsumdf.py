@@ -7,9 +7,9 @@ every slice and every PFP, with the cohpi selection stages stored as boolean col
 import numpy as np
 import pandas as pd
 
-from makedf.makedf import (make_mcdf, make_mcprimdf, make_mchdrdf, make_pandora_df_calo_update, make_opflashdf,
+from makedf.makedf import (make_mcdf, make_mcprimdf, make_mcprimdaughtersdf, make_mchdrdf, make_pandora_df, make_opflashdf,
                            make_trkhitdf_plane2, PDG)
-from makedf.branches import barycenterFMbranches, shwbranches
+from makedf.branches import barycenterFMbranches, shwbranches, trueparticlebranches
 from makedf.util import dmagdf, magdf
 from pyanalib.pandas_helpers import loadbranches, multicol_merge, multicol_add
 from analysis_village.cohpi.makedf.make_cohpidf_all_weight_signal import (
@@ -113,44 +113,60 @@ def make_xsum_primdf(f):
 
 
 # ------------------------------------------------------------------------------------------------ reco
+_PANDORA_CACHE = {}
+
+
 def _pandora(f):
-    """cohpi reco input: calo-updated pandora df, clear cosmics removed, PFPs within 50 cm of the vertex."""
-    pandora_df = make_pandora_df_calo_update(f)
-    bcfm = loadbranches(f["recTree"], barycenterFMbranches).rec
-    pandora_df = multicol_merge(bcfm, pandora_df, left_index=True, right_index=True, how="right", validate="one_to_many")
-    pandora_df[("pfp", "trk", "chi2pid", "I2", "mu_over_p", "")] = pandora_df.pfp.trk.chi2pid.I2.chi2_muon / pandora_df.pfp.trk.chi2pid.I2.chi2_proton
-    pandora_df[("pfp", "trk", "chi2pid", "I2", "arctan_mu_over_p", "")] = ((2 / np.pi) * np.arctan(pandora_df.pfp.trk.chi2pid.I2.mu_over_p / 0.8)).fillna(-0.2)
-    near = (pandora_df.pfp.dist_to_vertex < 6.) & (pandora_df.pfp.trk.len > 4.)
-    pandora_df[("pfp", "is_prong_candidate", "", "", "", "")] = near
-    pandora_df[("pfp", "is_trk_candidate", "", "", "", "")] = near & (pandora_df.pfp.trackScore > 0.5)
-    pandora_df[("pfp", "is_proton_candidate", "", "", "", "")] = near & (pandora_df.pfp.trackScore > 0.5) & (pandora_df.pfp.trk.chi2pid.I2.chi2_muon_new > 25.)
-    pandora_df[("pfp", "is_shower_candidate", "", "", "", "")] = pandora_df.pfp.trackScore < 0.50
+    """Calo-updated pandora df of every PFP of every non-clear-cosmic slice (no vertex-distance cut).
+
+    cafpyana applies all df functions to the same open file in one process, so the expensive calo update is
+    computed once per file and shared between the slc and pfp tables.
+    """
+    key = getattr(f, "file_path", None) or id(f)
+    if _PANDORA_CACHE.get("key") == key:
+        return _PANDORA_CACHE["df"]
+    pandora_df = make_pandora_df(f, trkScoreCut=False, trkDistCut=0, cutClearCosmic=True, requireFiducial=False, updatecalo=True)
+    if not pandora_df.empty:
+        bcfm = loadbranches(f["recTree"], barycenterFMbranches).rec
+        pandora_df = multicol_merge(bcfm, pandora_df, left_index=True, right_index=True, how="right", validate="one_to_many")
+        pandora_df[("pfp", "trk", "chi2pid", "I2", "mu_over_p", "")] = pandora_df.pfp.trk.chi2pid.I2.chi2_muon / pandora_df.pfp.trk.chi2pid.I2.chi2_proton
+        pandora_df[("pfp", "trk", "chi2pid", "I2", "arctan_mu_over_p", "")] = ((2 / np.pi) * np.arctan(pandora_df.pfp.trk.chi2pid.I2.mu_over_p / 0.8)).fillna(-0.2)
+        near = (pandora_df.pfp.dist_to_vertex < 6.) & (pandora_df.pfp.trk.len > 4.)
+        pandora_df[("pfp", "is_prong_candidate", "", "", "", "")] = near
+        pandora_df[("pfp", "is_trk_candidate", "", "", "", "")] = near & (pandora_df.pfp.trackScore > 0.5)
+        pandora_df[("pfp", "is_proton_candidate", "", "", "", "")] = near & (pandora_df.pfp.trackScore > 0.5) & (pandora_df.pfp.trk.chi2pid.I2.chi2_muon_new > 25.)
+        pandora_df[("pfp", "is_shower_candidate", "", "", "", "")] = pandora_df.pfp.trackScore < 0.50
+    _PANDORA_CACHE.clear()
+    _PANDORA_CACHE.update({"key": key, "df": pandora_df})
     return pandora_df
 
 
 def make_xsum_slcdf(f):
-    pandora_df = _pandora(f)
-    if pandora_df.empty:
+    all_df = _pandora(f)
+    if all_df.empty:
         return pd.DataFrame()
     g = lambda s: make_slc_var(s)
 
     slcdf = pd.DataFrame({
-        "is_fv": g(InFV_nohiyz(pandora_df.slc.vertex)),
-        "bcfm_score": g(pandora_df.slc.barycenterFM.score),
-        "nu_score": g(pandora_df.slc.nu_score),
-        "is_not_clear_cosmic": g(pandora_df.slc.is_clear_cosmic == 0),
-        "n_pfp": pandora_df.groupby(level=[0, 1]).size(),
-        "n_prong": pandora_df.pfp.is_prong_candidate.groupby(level=[0, 1]).sum(),
-        "n_trk": pandora_df.pfp.is_trk_candidate.groupby(level=[0, 1]).sum(),
-        "n_proton": pandora_df.pfp.is_proton_candidate.groupby(level=[0, 1]).sum(),
-        "n_shower": pandora_df.pfp.is_shower_candidate.groupby(level=[0, 1]).sum(),
-        "tmatch_idx": g(pandora_df.slc.tmatch.idx),
-        "tmatch_eff": g(pandora_df.slc.tmatch.eff),
-        "tmatch_purity": g(pandora_df.slc.tmatch.pur),
-        "vtx_x": g(pandora_df.slc.vertex.x),
-        "vtx_y": g(pandora_df.slc.vertex.y),
-        "vtx_z": g(pandora_df.slc.vertex.z),
+        "is_fv": g(InFV_nohiyz(all_df.slc.vertex)),
+        "bcfm_score": g(all_df.slc.barycenterFM.score),
+        "nu_score": g(all_df.slc.nu_score),
+        "is_not_clear_cosmic": g(all_df.slc.is_clear_cosmic == 0),
+        "n_pfp": all_df.groupby(level=[0, 1]).size(),
+        "n_pfp_50cm": (all_df.pfp.dist_to_vertex < 50.).groupby(level=[0, 1]).sum(),
+        "n_prong": all_df.pfp.is_prong_candidate.groupby(level=[0, 1]).sum(),
+        "n_trk": all_df.pfp.is_trk_candidate.groupby(level=[0, 1]).sum(),
+        "n_proton": all_df.pfp.is_proton_candidate.groupby(level=[0, 1]).sum(),
+        "n_shower": all_df.pfp.is_shower_candidate.groupby(level=[0, 1]).sum(),
+        "tmatch_idx": g(all_df.slc.tmatch.idx),
+        "tmatch_eff": g(all_df.slc.tmatch.eff),
+        "tmatch_purity": g(all_df.slc.tmatch.pur),
+        "vtx_x": g(all_df.slc.vertex.x),
+        "vtx_y": g(all_df.slc.vertex.y),
+        "vtx_z": g(all_df.slc.vertex.z),
     })
+    # the cohpi two-track block is defined on PFPs within 50 cm of the vertex (make_pandora_df_calo_update)
+    pandora_df = all_df[all_df.pfp.dist_to_vertex < 50.]
 
     # two longest track candidates, ordered by length (cohpi: muon = longer)
     order = pandora_df.sort_values(by=("pfp", "trk", "len", "", "", ""), ascending=False)
@@ -261,6 +277,24 @@ def make_xsum_pfpdf(f):
     out["slc_is_fv"] = InFV_nohiyz(pandora_df.slc.vertex).values
     out["slc_tmatch_idx"] = pandora_df.slc.tmatch.idx.values
 
+    # kaon-analysis PID: kaon and pion chi2 on all planes, muon and proton on the induction planes, kaon momenta
+    kb = "rec.slc.reco.pfp.trk."
+    try:
+        kdf = loadbranches(f["recTree"], [kb + f"chi2pid.{p}.chi2_{h}" for p in (0, 1, 2) for h in ("kaon", "pion")]
+                           + [kb + f"chi2pid.{p}.chi2_{h}" for p in (0, 1) for h in ("muon", "proton")]
+                           + [kb + "mcsP.fwdP_kaon"]).rec.slc.reco
+        kspec = {f"chi2_{h}_I{p}": ("pfp", "trk", "chi2pid", f"I{p}", f"chi2_{h}") for p in (0, 1, 2) for h in ("kaon", "pion")}
+        kspec.update({f"chi2_{h[:3] if h == 'proton' else h[:2]}_I{p}": ("pfp", "trk", "chi2pid", f"I{p}", f"chi2_{h}") for p in (0, 1) for h in ("muon", "proton")})
+        kspec["trk_mcsP_k"] = ("pfp", "trk", "mcsP", "fwdP_kaon")
+        out = out.join(pick(kdf, kspec), how="left")
+    except Exception as e:
+        print("make_xsum_pfpdf: no kaon PID branches:", e)
+    try:
+        rk = loadbranches(f["recTree"], [kb + "rangeP.p_kaon"]).rec.slc.reco
+        out = out.join(pick(rk, {"trk_rangeP_k": ("pfp", "trk", "rangeP", "p_kaon")}), how="left")
+    except Exception as e:
+        print("make_xsum_pfpdf: no kaon range momentum branch:", e)
+
     # showers
     try:
         shw = loadbranches(f["recTree"], shwbranches).rec.slc.reco
@@ -284,4 +318,27 @@ def make_xsum_pfpdf(f):
         out = out.join(tru, how="left")
     except Exception as e:
         print("make_xsum_pfpdf: no track truth branches:", e)
+    return out
+
+
+# ----------------------------------------------------------------------------------------------- Geant4 daughters
+def make_xsum_daughtdf(f):
+    """Geant4 daughters of every neutrino primary (one generation), from rec.true_particles.
+
+    One row per (neutrino, primary, daughter): pdg, G4ID, parent, energies, momentum, start/end, length,
+    containment, start/end process. Lets kaon and pion decay modes, pi0 photons and secondary interactions
+    be derived later without rerunning cafpyana.
+    """
+    dd = make_mcprimdaughtersdf(f)
+    if dd.empty:
+        return pd.DataFrame()
+    while dd.columns.nlevels > 1:
+        dd.columns = dd.columns.droplevel(0)
+    dd = flatten(dd)
+    dd.columns = ["G4ID"]
+    tp = loadbranches(f["recTree"], trueparticlebranches).rec.true_particles
+    tp = flatten(tp)
+    tp = tp.reset_index(level=list(range(1, tp.index.nlevels)), drop=True)   # keep 'entry' only
+    out = dd.reset_index().merge(tp.reset_index(), on=["entry", "G4ID"], how="left")
+    out = out.set_index(list(dd.index.names))
     return out

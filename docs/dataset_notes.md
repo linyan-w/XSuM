@@ -110,7 +110,13 @@ Input samples:
   `SAM_WEB_HOST`/`SAM_WEB_BASE_URL`, the default `samweb.fnal.gov` does not resolve on sbndbuild03). This is
   the full official sample for the second production; about 13 events per file, so the per-file overhead
   dominates (about 2 s per file per worker measured with 5 workers). Tables: `mcnu` (every neutrino, full
-`make_mcdf` truth + cohpi kinematics + `nuint_categ`), `mcprim` (every primary), `slc` (every non-clear-cosmic
-slice with the cohpi variables and selection stages `pass_*` as flags, `pass_cohpi` = full selection incl.
-sphere-charge and cathode-crosser cuts from the notebook, `in_sr` = signal region), `pfp` (every PFP within
-50 cm of the vertex: track, shower, chi2 incl. re-calibrated, truth match), `hdr`, `pot`.
+`make_mcdf` truth + cohpi kinematics + `nuint_categ`), `mcprim` (every primary), `mcdaught` (every Geant4
+daughter of every primary, from `rec.true_particles`: pdg, G4ID, parent, energies, momentum, start/end,
+length, containment, start/end process; kaon and pion decay modes and pi0 photons are derived from it),
+`slc` (every non-clear-cosmic slice with the cohpi variables and selection stages `pass_*` as flags,
+`pass_cohpi` = full selection incl. sphere-charge and cathode-crosser cuts from the notebook, `in_sr` =
+signal region; the cohpi two-track block is defined on PFPs within 50 cm of the vertex as in the cohpi code),
+`pfp` (every PFP of those slices, no vertex-distance cut: track, shower, chi2 for mu/p/pi/K on all planes
+and re-calibrated mu/p, range and MCS momenta incl. kaon, PFP parent/id links, truth match), `hdr`, `pot`.
+The kaon-analysis candidate pairs are rebuilt from `pfp` (parent/id, kaon chi2, endpoints) and the kaon
+truth labels from `mcprim` + `mcdaught`.
