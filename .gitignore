@@ -24,3 +24,6 @@ reports/*/train.log
 # internal technotes (not for GitHub)
 reference/
 *.pkl
+reports/technote/*
+!reports/technote/main.tex
+!reports/technote/main.pdf

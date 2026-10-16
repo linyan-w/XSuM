@@ -1,0 +1,185 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,longtable}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+\usepackage{placeins}
+\input{numbers.tex}
+\newcommand{\real}{Pandora}
+
+\title{XSuM: a generative surrogate of the SBND reconstruction chain\\ trained on the BNB Monte Carlo --- technical note}
+\author{L.~Wan\thanks{lwan@fnal.gov}}
+\date{\today\ (work in progress)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+XSuM is a per-event surrogate of the SBND simulation and reconstruction chain: given the true neutrino vertex and
+the post-FSI final-state particles of an interaction, it samples the record that the cafpyana analysis dataframes
+hold for that interaction (whether and how many Pandora slices are truth-matched to it, the slice-level block of
+about fifty reconstructed quantities, and later the set of particle-flow objects), in the same dataframe format
+as the production. Analyses then run unchanged on the surrogated dataframes. The model is trained on the 2026
+gen2 BNB + cosmics central-value Monte Carlo (v10\_14\_02\_03) processed with a selection-free cafpyana
+configuration written for this purpose. This note documents the data, the inputs and outputs, the baseline
+and flow-matching models, and their closure on held-out files. It is updated as the production and the models
+progress.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+\section{Purpose and scope}
+\label{sec:scope}
+
+The physics case is forward folding without re-simulation: a cross-section model that was never run through
+Geant4, Pandora and cafpyana (another generator, a modified FSI model, a new kinematic region) is transported to
+reconstruction level by the surrogate and compared with data or with the nominal MC at that level. The surrogate
+does not fix data/MC disagreement; it reproduces the MC detector response, including its flaws, for new inputs.
+
+Scope decisions (2026-10-16): XSuM generates the complete reconstruction record, not analysis quantities.
+Selection flags, BDT scores and derived kinematics such as $|t|$ are recomputed downstream by the analysers
+(CC coherent pion: S.~Oh; charged kaons: T.~Wester) from the generated variables. Cosmic-only slices do not
+depend on the neutrino model and are reused from the MC. Generator-internal labels (interaction mode, CC/NC,
+$W$, $Q^2$, $E_\nu$, signal flags) are never inputs; they are kept in a separate label table for holdout tests.
+
+\begin{figure}[h]
+\centering\includegraphics[width=\textwidth]{io_schematic.pdf}
+\caption{Inputs, surrogate, generated record and downstream use. One row of the diagram is one true neutrino
+interaction.}
+\label{fig:io}
+\end{figure}
+
+\section{Data}
+\label{sec:data}
+
+\paragraph{Production.} A cafpyana df-maker configuration (\texttt{analysis\_village/xsum/}) writes, per flat
+CAF: \texttt{mcnu} (every true neutrino with the full \texttt{make\_mcdf} truth, the cohpi kinematics and
+category), \texttt{mcprim} (every post-FSI primary), \texttt{mcdaught} (the Geant4 daughters of every primary),
+\texttt{slc} (every non-clear-cosmic slice with the cohpi variables and each selection stage as a flag),
+\texttt{pfp} (every PFP of those slices with track, shower and PID variables, kaon PID on all planes, parent
+links and truth match), \texttt{hdr} and POT tables. Two productions:
+\begin{itemize}
+\item \textbf{scratch1633}: the 1,633 merged flat CAFs (2.5\,GB, about 3,300 triggers each) still present on
+      the dCache scratch area referenced by the cafpyana sample list (1,363 of the 2,996 had been purged), run in
+      pool mode on \texttt{sbndbuild03} with 30 workers in about 3.5\,h: 15.5\,GB of dataframes,
+      \nNu{} neutrinos in the five chunks used here. This production predates the \texttt{mcdaught} table, the
+      kaon PID branches and the removal of the 50\,cm vertex-distance cut on PFPs.
+\item \textbf{official}: the SAM definition
+      \texttt{aurora\_SBND2026A\_gen2\_BNBLight\_prodgenie\_corsika\_proton\_rockbox0p1\_sbnd\_CV\_v10\_14\_02\_03\_flatcaf\_sbnd}
+      (749,262 flat CAFs, 9.94\,M triggers, 7.9\,TB), submitted as 2,000 grid jobs on 2026-10-16 after a
+      375-file pilot (21.5\,s per file single-threaded, 4,500 CPU-hours in total).
+\end{itemize}
+
+\paragraph{Truth--reco link.} A slice points to its truth-matched neutrino through \texttt{tmatch\_idx}; a PFP
+points to the true particle it was matched to and, through \texttt{interaction\_id}, to its neutrino. A
+neutrino can have zero, one or several matched slices; the table keeps the slice with the highest match
+efficiency and records the count.
+
+\paragraph{Splits.} Train / validation / test are 80 / 10 / 10 by input file, never by row. In the five
+scratch chunks: \nTrain{} / \nTest{} neutrinos in train / test. Holdout tests use physics regions
+(momentum transfer, energy, angle, multiplicity, TPC), see Sec.~\ref{sec:outlook}.
+
+\section{Inputs and targets}
+\label{sec:io}
+
+\paragraph{Inputs.} The post-FSI primary particles (species, $(p_x,p_y,p_z)$; neutrinos and nuclear remnants
+dropped) and the true vertex. The M1 and M2 models use \nFeat{} fixed features derived from them: the vertex
+and its distances to the cathode and the walls; per species (mu, e, p, n, pi$^\pm$, pi$^0$, gamma, K$^\pm$,
+K$^0$, Lambda, Sigma) the multiplicity above the cohpi thresholds (27 / 30 / 20\,MeV for mu / pi / p), the
+summed and maximum kinetic energy and the leading particle's momentum, $\cos\theta$ and $p_T$; and totals
+(charged multiplicity, visible and total kinetic energy, electromagnetic energy, longitudinal momentum). The
+particle-set encoder (M3) will consume the particles directly.
+
+\paragraph{Targets.} Tier 0: the number of matched slices and, per slice, which groups of variables exist
+(a second track, the two-track topology, hits within 1--4\,cm of the vertex) and the two containment flags.
+Tier 1: the slice block (Table~\ref{tab:m2cols} lists the columns). Tier 2 (M4): the PFP set.
+
+\section{M1 baselines}
+\label{sec:m1}
+
+Gradient-boosted classifiers for the discrete targets and mixture density networks (MDN, eight diagonal
+Gaussians, against a single Gaussian) for continuous responses, on the \nFeat{} features. Results on the
+test files of the five scratch chunks (\mOneDir).
+
+\paragraph{Slice efficiency.} \fracMatched\% of all true neutrinos (dirt and out-of-volume included) have a
+truth-matched slice. Log loss \matchedLL{} against a marginal \matchedLLm, AUC \matchedAUC. The calibration
+against vertex $z$, muon momentum, visible energy and multiplicity is shown in Fig.~\ref{fig:m1match}.
+
+\begin{figure}[h]
+\centering\includegraphics[width=\textwidth]{figures/\mOneDirBase/m1_matched_calibration.png}
+\caption{Observed and predicted probability that a slice is truth-matched to the neutrino, test files.}
+\label{fig:m1match}
+\end{figure}
+
+\paragraph{cohpi selection as a yardstick.} The full cohpi selection (including the sphere-charge and
+cathode-crossing cuts) keeps \fracSelected\% of neutrinos. As a check of the production, the selected count
+per POT agrees with the technote cut flow within 10\%. The classifier reaches log loss \selLL{} against
+\selLLm{} (AUC \selAUC); per true category:
+
+\begin{center}\input{m1_selected_categ.tex}\end{center}
+
+\paragraph{PFP multiplicity} of the matched slice: log loss \npfpLL{} against \npfpLLm{}, accuracy
+\npfpAcc\% against \npfpAccm\% (Fig.~\ref{fig:m1mult}).
+
+\begin{figure}[h]
+\centering\includegraphics[width=0.8\textwidth]{figures/\mOneDirBase/m1_multiplicity.png}
+\caption{PFP multiplicity of the matched slice: marginal and mean versus charged primaries.}
+\label{fig:m1mult}
+\end{figure}
+
+\paragraph{Continuous responses.} Table~\ref{tab:m1mdn} gives the test negative log-likelihood and
+Table~\ref{tab:m1marg} the marginals; Figs.~\ref{fig:m1vtx}--\ref{fig:m1two} show them.
+
+\begin{table}[h]\centering\input{m1_mdn.tex}\caption{M1 MDN test NLL per target.}\label{tab:m1mdn}\end{table}
+\begin{table}[h]\centering\small\input{m1_marginals.tex}\caption{Marginals of the MDN samples against \real{}, test files.}\label{tab:m1marg}\end{table}
+
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/\mOneDirBase/m1_vertex.png}
+\caption{Vertex residual of the matched slice (FV neutrinos).}\label{fig:m1vtx}\end{figure}
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/\mOneDirBase/m1_leadtrack.png}
+\caption{Longest track: direction relative to the leading charged primary and length.}\label{fig:m1lead}\end{figure}
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/\mOneDirBase/m1_twotrack.png}
+\caption{cohpi two-track response on 1mu1pi events passing the two-track topology.}\label{fig:m1two}\end{figure}
+\FloatBarrier
+
+\section{M2: flow-matching surrogate of the slice block}
+\label{sec:m2}
+
+A conditional flow-matching model (linear path, Gaussian source, velocity MLP) over the standardised slice
+block, with a per-event mask for the groups that do not exist in that slice (sim2reco \texttt{dim\_mask}), and
+gradient-boosted heads for slice cardinality, group presence and the containment flags. Counts are
+dequantised, positive quantities enter as logarithms, standardisation is robust (median, MAD). Sampling
+proceeds presence $\to$ flow $\to$ inverse transforms $\to$ a dataframe with the production column names.
+Trained on \mTwoMatched{} matched slices for \mTwoEpochs{} epochs.
+
+\begin{table}[h]\centering\input{m2_presence.tex}\caption{Group presence and containment heads, test files.}\label{tab:m2pres}\end{table}
+
+\paragraph{Closure on the test files.} Table~\ref{tab:m2cols} compares every generated column with \real{}
+(fraction present and Wasserstein-1 in transformed units; median $W_1$ \mTwoWmed, maximum \mTwoWmax).
+Table~\ref{tab:m2cut} recomputes the cohpi cut flow on the generated and the real test slices, for all slices
+and for true signal; this is the kind of comparison the analysers will make on the full surrogated sample.
+
+\IfFileExists{figures/m2_scratch1633/m2_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_scratch1633/m2_marginals.png}
+\caption{Marginals of generated (flow) against \real{} slice variables, test files.}\label{fig:m2marg}\end{figure}}{(M2 figure not yet available)}
+
+\begin{table}[h]\centering\input{m2_cutflow.tex}\caption{cohpi cut flow recomputed on real and generated test slices.}\label{tab:m2cut}\end{table}
+
+\small\input{m2_columns.tex}\normalsize
+\FloatBarrier
+
+\section{Outlook}
+\label{sec:outlook}
+
+\begin{enumerate}
+\item Official sample (9.94\,M triggers): retrain M1/M2, add the \texttt{mcdaught} and full-PFP tables.
+\item M3: particle-set encoder (transformer over primaries + vertex token) replacing the fixed features.
+\item M4: PFP set generation (cardinality + equivariant set flow), Bayesian last layers for an epistemic flag.
+\item Holdouts: train on $|t|<0.1$, test the tail; low versus high $E_\nu$; forward versus wide-angle muons;
+      $\le 2$ versus $\ge 3$ charged primaries; one TPC versus the other.
+\item Surrogated dataframes written in the production format for the cohpi and kaon analysers.
+\end{enumerate}
+
+\end{document}
