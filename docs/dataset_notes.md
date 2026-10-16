@@ -146,3 +146,15 @@ Full submission: 2,000 jobs over the 748,887 remaining files (the pilot's 375 ex
 the dataset), 2026-10-16 12:05. Memory note: the merged-file test of the extended module peaked at
 19 GB RSS (true-particle table + calo update of every PFP of 3,300 events); official files (13 events) need
 well under 1 GB.
+
+# Surrogated datasets
+
+`scripts/generate_slc.py` samples slice records for a truth table with a trained surrogate;
+`scripts/write_surrogate_df.py` writes them in the production format: one `xsum_surrogate_chunkN.df` per
+production chunk with `mcnu`, `mcprim`, `hdr`, `histpotdf`, `histgenevtdf`, `pot` copied from the production
+and `slc_0` replaced by the generated slices (index `(__ntuple, entry, rec.slc..index)`, `tmatch_idx` = the
+generating neutrino, `tmatch_eff` / `tmatch_purity` NaN, `is_fv` from the generated vertex, selection flags
+recomputed, `surrogate_topology_class` added), plus `file_splits.parquet` (train / val / test per input file,
+same rule and seed as training). Comparisons with the real chain should use the test files only.
+First dataset: `surrogate_v3_6ch` (M2 v3 trained on all six scratch chunks, applied to the same 9.8 M
+neutrinos), in `/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_v3_6ch/` once written. No `pfp` table yet.
