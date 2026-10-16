@@ -147,12 +147,23 @@ Table~\ref{tab:m1marg} the marginals; Figs.~\ref{fig:m1vtx}--\ref{fig:m1two} sho
 \section{M2: flow-matching surrogate of the slice block}
 \label{sec:m2}
 
-A conditional flow-matching model (linear path, Gaussian source, velocity MLP) over the standardised slice
-block, with a per-event mask for the groups that do not exist in that slice (sim2reco \texttt{dim\_mask}), and
-gradient-boosted heads for slice cardinality, group presence and the containment flags. Counts are
-dequantised, positive quantities enter as logarithms, standardisation is robust (median, MAD). Sampling
-proceeds presence $\to$ flow $\to$ inverse transforms $\to$ a dataframe with the production column names.
-Trained on \mTwoMatched{} matched slices for \mTwoEpochs{} epochs.
+Generation proceeds in three steps. (i) A \emph{topology} head: a softmax classifier over the joint pattern
+of PFP counts (\texttt{n\_pfp, n\_prong, n\_trk, n\_proton, n\_shower}; the 120 most frequent tuples plus
+``other'', whose members are drawn from the training pool), sampled first; its one-hot encoding conditions
+everything that follows. (ii) Gradient-boosted heads for the presence of the variable groups that may not exist
+in a slice (second track, two-track block, hits within 1--4\,cm of the vertex), for the two containment flags,
+and for the point masses at detector boundaries (vertex pinned at $z=0$ or at the $x$, $y$ walls, back-to-back
+track pairs). (iii) A conditional flow-matching model (linear path, Gaussian source, 6-layer velocity MLP of
+width 1024) over the standardised continuous block, masked per event to the groups and dimensions that exist
+(sim2reco \texttt{dim\_mask}). Positive quantities enter as logarithms, direction cosines and the opening
+angle through $\operatorname{artanh}$ (and direction vectors are renormalised), standardisation is robust
+(median, MAD). Inverse transforms produce a dataframe with the production column names. Trained on
+\mTwoMatched{} matched slices for \mTwoEpochs{} epochs (26\,min on one RTX~3090).
+
+Earlier versions and what they taught: v1 (unbounded cosines, counts as dequantised flow dimensions) closed
+the cohpi cut flow only to 45\% in the signal region; v2 (bounded cosines, point-mass heads) to 74\%, losing
+most at the exact-count stage; v3 (topology head) closes every stage within statistics
+(Table~\ref{tab:m2cut}).
 
 \begin{table}[h]\centering\input{m2_presence.tex}\caption{Group presence and containment heads, test files.}\label{tab:m2pres}\end{table}
 
@@ -161,8 +172,8 @@ Trained on \mTwoMatched{} matched slices for \mTwoEpochs{} epochs.
 Table~\ref{tab:m2cut} recomputes the cohpi cut flow on the generated and the real test slices, for all slices
 and for true signal; this is the kind of comparison the analysers will make on the full surrogated sample.
 
-\IfFileExists{figures/m2_scratch1633_v2/m2_marginals.png}{%
-\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_scratch1633_v2/m2_marginals.png}
+\IfFileExists{figures/m2_scratch1633_v3/m2_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_scratch1633_v3/m2_marginals.png}
 \caption{Marginals of generated (flow) against \real{} slice variables, test files.}\label{fig:m2marg}\end{figure}}{(M2 figure not yet available)}
 
 \begin{table}[h]\centering\input{m2_cutflow.tex}\caption{cohpi cut flow recomputed on real and generated test slices.}\label{tab:m2cut}\end{table}
