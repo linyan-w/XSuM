@@ -120,3 +120,21 @@ signal region; the cohpi two-track block is defined on PFPs within 50 cm of the 
 and re-calibrated mu/p, range and MCS momenta incl. kaon, PFP parent/id links, truth match), `hdr`, `pot`.
 The kaon-analysis candidate pairs are rebuilt from `pfp` (parent/id, kaon chi2, endpoints) and the kaon
 truth labels from `mcprim` + `mcdaught`.
+
+## Grid production of the official sample
+
+From `/scratch/lwan/xsum/cafpyana` on sbndbuild03 (module committed in the clone, since grid mode ships
+`git archive HEAD`; `envs/xrootd-5.6.9` is a link to an existing XRootD python build):
+
+```
+source /scratch/lwan/xsum/xsum_env.sh            # also sources /etc/profile.d/jobsub_lite.sh (JOBSUB_DROPBOX_SERVER_LIST)
+export CAFPYANA_GRID_OUT_DIR=/pnfs/sbnd/scratch/users/lwan/cafpyana_out
+htgettoken -a htvaultprod.fnal.gov -i sbnd
+python run_df_maker.py -c analysis_village/xsum/configs/xsum_surrogate.py -l lists/sam_flatcaf_urls.txt -o xsum_v10_14_02_03 -ngrid 2000
+```
+
+Each job copies its ~375 flat CAFs with xrdcp, builds the cafpyana venv on the node, runs single-threaded and
+writes `<out>_<job>.df` to `$CAFPYANA_GRID_OUT_DIR/dfs/<timestamp>__<out>/`. Pilot: one job over 375 files
+(cluster 72523085, 2026-10-16 09:25). Memory note: the merged-file test of the extended module peaked at
+19 GB RSS (true-particle table + calo update of every PFP of 3,300 events); official files (13 events) need
+well under 1 GB.
