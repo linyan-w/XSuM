@@ -158,7 +158,8 @@ width 1024) over the standardised continuous block, masked per event to the grou
 (sim2reco \texttt{dim\_mask}). Positive quantities enter as logarithms, direction cosines and the opening
 angle through $\operatorname{artanh}$ (and direction vectors are renormalised), standardisation is robust
 (median, MAD). Inverse transforms produce a dataframe with the production column names. Trained on
-\mTwoMatched{} matched slices for \mTwoEpochs{} epochs (26\,min on one RTX~3090).
+\mTwoMatched{} matched slices (all six chunks of the scratch production) for \mTwoEpochs{} epochs (23\,min on one RTX~3090,
+peak 12\,GB of host memory).
 
 Earlier versions and what they taught: v1 (unbounded cosines, counts as dequantised flow dimensions) closed
 the cohpi cut flow only to 45\% in the signal region; v2 (bounded cosines, point-mass heads) to 74\%, losing
@@ -172,8 +173,8 @@ most at the exact-count stage; v3 (topology head) closes every stage within stat
 Table~\ref{tab:m2cut} recomputes the cohpi cut flow on the generated and the real test slices, for all slices
 and for true signal; this is the kind of comparison the analysers will make on the full surrogated sample.
 
-\IfFileExists{figures/m2_scratch1633_v3/m2_marginals.png}{%
-\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_scratch1633_v3/m2_marginals.png}
+\IfFileExists{figures/m2_scratch1633_v3_6ch/m2_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_scratch1633_v3_6ch/m2_marginals.png}
 \caption{Marginals of generated (flow) against \real{} slice variables, test files.}\label{fig:m2marg}\end{figure}}{(M2 figure not yet available)}
 
 \begin{table}[h]\centering\input{m2_cutflow.tex}\caption{cohpi cut flow recomputed on real and generated test slices.}\label{tab:m2cut}\end{table}
