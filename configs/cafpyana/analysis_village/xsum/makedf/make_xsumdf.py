@@ -289,11 +289,7 @@ def make_xsum_pfpdf(f):
         out = out.join(pick(kdf, kspec), how="left")
     except Exception as e:
         print("make_xsum_pfpdf: no kaon PID branches:", e)
-    try:
-        rk = loadbranches(f["recTree"], [kb + "rangeP.p_kaon"]).rec.slc.reco
-        out = out.join(pick(rk, {"trk_rangeP_k": ("pfp", "trk", "rangeP", "p_kaon")}), how="left")
-    except Exception as e:
-        print("make_xsum_pfpdf: no kaon range momentum branch:", e)
+    # (no rangeP.p_kaon branch in the v10_14 flat CAFs; twester derives it offline)
 
     # showers
     try:
