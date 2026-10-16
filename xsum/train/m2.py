@@ -27,7 +27,6 @@ from .baselines import Standardizer, gbdt
 SPEC = [
     ("vtx_x", "lin", "base"), ("vtx_y", "lin", "base"), ("vtx_z", "lin", "base"),
     ("nu_score", "lin", "base"), ("bcfm_score", "lin", "base"), ("total_pe", "log", "base"),
-    ("n_pfp", "lin", "base"), ("n_prong", "lin", "base"), ("n_trk", "lin", "base"), ("n_proton", "lin", "base"), ("n_shower", "lin", "base"),
     ("long_dirx", "atanh", "base"), ("long_diry", "atanh", "base"), ("long_dirz", "atanh", "base"), ("long_trk_len", "log", "base"),
     ("long_trk_pid", "lin", "base"), ("long_trk_chi2_mu", "log1p", "base"), ("long_trk_chi2_pro", "log1p", "base"),
     ("long_trk_chi2_mu_new", "log1p", "base"), ("long_trk_chi2_pro_new", "log1p", "base"),
@@ -43,7 +42,9 @@ SPEC = [
 ]
 GROUPS = ["short", "two", "s1", "s2", "s3", "s4"]
 FLAGS = ["is_muon_contained", "is_cpi_contained"]   # Bernoulli, defined on the two-track group
-COUNT_COLS = {"n_pfp", "n_prong", "n_trk", "n_proton", "n_shower"}
+COUNT_COLS = set()
+TOPO_COLS = ["n_pfp", "n_prong", "n_trk", "n_proton", "n_shower"]   # joint categorical head, top patterns + "other"
+N_TOPO = 120
 
 
 EDGE = 1 - 1e-5
@@ -81,10 +82,6 @@ class BlockTransform:
     def matrix(self, df):
         Y = np.stack([fwd(df[c].to_numpy(), tf) for c, tf, _ in self.spec], 1)
         Y[:, self.cols.index("bcfm_score")][df["bcfm_score"].to_numpy() < -100] = np.nan   # -9999 sentinel: no flash match
-        # dequantise counts so the flow does not have to learn deltas
-        rng = np.random.default_rng(0)
-        for c in COUNT_COLS:
-            j = self.cols.index(c); Y[:, j] = Y[:, j] + rng.uniform(-0.5, 0.5, len(Y))
         return Y
 
     def fit(self, Y):
@@ -101,7 +98,6 @@ class BlockTransform:
         out = {}
         for j, (c, tf, _) in enumerate(self.spec):
             v = inv(Y[:, j], tf)
-            if c in COUNT_COLS: v = np.rint(v).clip(1 if c == "n_pfp" else 0)
             out[c] = np.where(M[:, j] > 0, v, np.nan)
         df = pd.DataFrame(out, index=index)
         for t in ("long", "short"):
@@ -109,6 +105,32 @@ class BlockTransform:
             for a in ("x", "y", "z"):
                 df[f"{t}_dir{a}"] = df[f"{t}_dir{a}"] / n.where(n > 0, 1.0)
         return df
+
+
+class Topology:
+    """Joint categorical over (n_pfp, n_prong, n_trk, n_proton, n_shower): the N_TOPO most frequent tuples + other."""
+    def __init__(self, T, train_mask, n=N_TOPO):
+        tup = T.loc[train_mask, TOPO_COLS].fillna(-1).astype(int).apply(tuple, axis=1)
+        self.classes = list(tup.value_counts().index[:n])
+        self.lookup = {t: i for i, t in enumerate(self.classes)}
+        self.other = len(self.classes)
+        self.other_pool = np.array([t for t in tup if t not in self.lookup], dtype=float)   # rare tuples, sampled when "other"
+        if len(self.other_pool) == 0: self.other_pool = np.array([self.classes[-1]], dtype=float)
+
+    def encode(self, T):
+        tup = T[TOPO_COLS].fillna(-1).astype(int).apply(tuple, axis=1)
+        return tup.map(self.lookup).fillna(self.other).astype(int).to_numpy()
+
+    def onehot(self, k):
+        H = np.zeros((len(k), self.other + 1), dtype=np.float32); H[np.arange(len(k)), k] = 1.0; return H
+
+    def decode(self, k, rng=None):
+        rng = rng or np.random.default_rng(0)
+        arr = np.array(self.classes + [(-1,) * len(TOPO_COLS)], dtype=float)
+        out = arr[k]
+        oth = k == self.other
+        out[oth] = self.other_pool[rng.integers(0, len(self.other_pool), int(oth.sum()))]
+        return pd.DataFrame(out, columns=TOPO_COLS)
 
 
 def presence(T, bt):
@@ -197,21 +219,32 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     Pn = np.zeros((int(te.sum()), 3)); Pn[:, heads["n_matched_slices"].classes_] = heads["n_matched_slices"].predict_proba(X[te])
     metrics["n_matched_slices"] = {"marginal_true": np.bincount(ncl[te], minlength=3).tolist(), "mean_prob": Pn.mean(0).tolist(),
                                    "logloss": float(-np.log(np.clip(Pn[np.arange(len(Pn)), ncl[te]], 1e-9, None)).mean())}
+    # topology: joint categorical over the PFP counts, sampled first and fed to every other component
+    topo = Topology(T, tr & matched); ktrue = topo.encode(T)
+    heads["topology"] = gbdt(X[tr & matched], ktrue[tr & matched], seed, max_iter=400)
+    Pt = np.zeros((int((te & matched).sum()), topo.other + 1)); Pt[:, heads["topology"].classes_] = heads["topology"].predict_proba(X[te & matched])
+    metrics["topology"] = {"n_classes": topo.other + 1, "frac_other_train": float((ktrue[tr & matched] == topo.other).mean()),
+                           "logloss": float(-np.log(np.clip(Pt[np.arange(len(Pt)), ktrue[te & matched]], 1e-9, None)).mean()),
+                           "logloss_marginal": float(-np.log(np.clip(np.bincount(ktrue[tr & matched], minlength=topo.other + 1)[ktrue[te & matched]] / (tr & matched).sum(), 1e-9, None)).mean()),
+                           "accuracy": float((Pt.argmax(1) == ktrue[te & matched]).mean())}
+    print("topology:", {k: round(v, 4) for k, v in metrics["topology"].items()}, flush=True)
+    Hk = topo.onehot(ktrue)                      # real topology one-hot (training / teacher forcing)
+    XH = np.concatenate([X, Hk], 1)              # GBDT heads see features + topology
     bt = BlockTransform(); P = presence(T, bt)
     pres_metrics = {}
     for g in GROUPS:
         y = P[g].astype(int); m = matched
-        heads[g] = gbdt(X[tr & m], y[tr & m], seed, max_iter=300)
-        pres_metrics[g] = binary_metrics(y[te & m], heads[g].predict_proba(X[te & m])[:, 1])
+        heads[g] = gbdt(XH[tr & m], y[tr & m], seed, max_iter=300)
+        pres_metrics[g] = binary_metrics(y[te & m], heads[g].predict_proba(XH[te & m])[:, 1])
     for fl in FLAGS:
         y = np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int); m = matched & P["two"]
-        heads[fl] = gbdt(X[tr & m], y[tr & m], seed, max_iter=300)
-        pres_metrics[fl] = binary_metrics(y[te & m], heads[fl].predict_proba(X[te & m])[:, 1])
+        heads[fl] = gbdt(XH[tr & m], y[tr & m], seed, max_iter=300)
+        pres_metrics[fl] = binary_metrics(y[te & m], heads[fl].predict_proba(XH[te & m])[:, 1])
     for c, (test, _) in SPIKES.items():
         v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
         m = matched & ok & (P["two"] if c == "opening_angle" else True)
-        heads["spike_" + c] = gbdt(X[tr & m], y[tr & m], seed, max_iter=300)
-        pres_metrics["spike_" + c] = binary_metrics(y[te & m], heads["spike_" + c].predict_proba(X[te & m])[:, 1])
+        heads["spike_" + c] = gbdt(XH[tr & m], y[tr & m], seed, max_iter=300)
+        pres_metrics["spike_" + c] = binary_metrics(y[te & m], heads["spike_" + c].predict_proba(XH[te & m])[:, 1])
     metrics["presence"] = pres_metrics
     print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
 
@@ -223,29 +256,42 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     for c, (test, _) in SPIKES.items():
         j = bt.cols.index(c); v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v)
         Mg[Sreal[c], j] = 0.0                      # point masses are not modelled by the flow
-    model, hist = train_flow(Z[tr & matched], Mg[tr & matched], C[tr & matched], Z[va & matched], Mg[va & matched], C[va & matched], epochs, device, hidden, n_layers, seed=seed)
+    CH = np.concatenate([C, Hk], 1)
+    model, hist = train_flow(Z[tr & matched], Mg[tr & matched], CH[tr & matched], Z[va & matched], Mg[va & matched], CH[va & matched], epochs, device, hidden, n_layers, seed=seed)
     metrics["flow_val_curve"] = hist
 
     # ---- closure on the test split: real vs generated slice blocks ---------------------------------------------
     tm = te & matched; idx = T.index[tm]
     rng = np.random.default_rng(seed)
-    Pg = {g: rng.random(int(tm.sum())) < heads[g].predict_proba(X[tm])[:, 1] for g in GROUPS}
+    Ptm = np.zeros((int(tm.sum()), topo.other + 1)); Ptm[:, heads["topology"].classes_] = heads["topology"].predict_proba(X[tm])
+    kgen = (Ptm.cumsum(1) > rng.random(len(Ptm))[:, None]).argmax(1)
+    XHg = np.concatenate([X[tm], topo.onehot(kgen)], 1); CHg = np.concatenate([C[tm], topo.onehot(kgen)], 1)
+    Pg = {g: rng.random(int(tm.sum())) < heads[g].predict_proba(XHg)[:, 1] for g in GROUPS}
     Mgen = mask_from_presence(Pg, bt)
     Sgen = {}
     for c, (test, value) in SPIKES.items():
-        j = bt.cols.index(c); p = heads["spike_" + c].predict_proba(X[tm])[:, 1]
+        j = bt.cols.index(c); p = heads["spike_" + c].predict_proba(XHg)[:, 1]
         Sgen[c] = (rng.random(len(p)) < p) & (Mgen[:, j] > 0); Mgen[Sgen[c], j] = 0.0
-    Zgen = sample_flow(model, C[tm], Mgen, device)
+    Zgen = sample_flow(model, CHg, Mgen, device)
     gen = bt.frame(Zgen, Mgen, idx)
     real = bt.frame(Z[tm], Mg[tm], idx)           # same transform round trip for a fair comparison
+    cnt_gen = topo.decode(kgen, rng); cnt_gen.index = idx
+    for c in TOPO_COLS:
+        gen[c] = cnt_gen[c]; real[c] = T[c].to_numpy()[tm]
     Ftm = F[tm]
     for c, (test, value) in SPIKES.items():
         gen.loc[Sgen[c], c] = value(Ftm)[Sgen[c]]
         real.loc[Sreal[c][tm], c] = T[c].to_numpy()[tm][Sreal[c][tm]]
     for fl in FLAGS:
-        p = heads[fl].predict_proba(X[tm])[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(len(p)) < p).astype(float), np.nan)
+        p = heads[fl].predict_proba(XHg)[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(len(p)) < p).astype(float), np.nan)
         real[fl] = T[fl].to_numpy()[tm]
+    metrics["topology_sampled_vs_true_test"] = {"frac_equal": float((kgen == ktrue[tm]).mean()),
+                                                "two_track_tuple_rate": {"real": float(((real.n_prong == 2) & (real.n_trk == 2) & (real.n_proton == 0) & (real.n_shower == 0)).mean()),
+                                                                         "generated": float(((gen.n_prong == 2) & (gen.n_trk == 2) & (gen.n_proton == 0) & (gen.n_shower == 0)).mean())}}
     percol = {}
+    for c in TOPO_COLS:
+        r, f = real[c].to_numpy(), gen[c].to_numpy(); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
+        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
     for j, (c, tf, g) in enumerate(SPEC):   # compared in transformed units (log / atanh / lin), point masses included
         r, f = fwd(real[c].to_numpy(), tf), fwd(gen[c].to_numpy(), tf); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
         percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
@@ -261,13 +307,13 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     show = ["vtx_z", "total_pe", "n_pfp", "long_trk_len", "long_dirz", "long_trk_chi2_pro_new", "short_trk_len", "reco_t", "range_p_mu", "opening_angle", "sum_integ_2cm", "nu_score"]
     fig, axs = plots.plt.subplots(3, 4, figsize=(14, 9)); axs = axs.ravel()
     for ax, c in zip(axs, show):
-        tf = dict((s[0], s[1]) for s in SPEC)[c]
+        tf = dict((s[0], s[1]) for s in SPEC).get(c, "lin")
         r, f = fwd(real[c].dropna(), tf), fwd(gen[c].dropna(), tf); r, f = r[np.isfinite(r)], f[np.isfinite(f)]
         lo, hi = np.percentile(np.concatenate([r, f]), [0.5, 99.5])
         plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
     plots.save(fig, out / "figures" / "m2_marginals.png")
     gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
-    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1], "hidden": hidden, "n_layers": n_layers,
+    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": CH.shape[1], "topology_classes": topo.classes, "hidden": hidden, "n_layers": n_layers,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": SPEC}, out / "model.pt")
     import pickle; pickle.dump(heads, open(out / "heads.pkl", "wb"))
     metrics["runtime_s"] = time.time() - t0
