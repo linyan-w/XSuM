@@ -121,15 +121,17 @@ the object the cross-section unfolding uses), and a classifier two-sample test.
 ## 8. Dataframe the full surrogate needs
 
 The example df was made by `analysis_village/cohpi/configs/cohpi_all_weight_signal.py` in cafpyana, which
-keeps only signal neutrinos and applies the final selection before writing `evt`. A surrogate configuration
-(draft in `configs/cafpyana/xsum_surrogate.py`) should produce, from the same flat CAFs:
+keeps only signal neutrinos and applies the final selection before writing `evt`. The XSuM configuration
+(`configs/cafpyana/analysis_village/xsum/`, run on sbndbuild03, see `docs/dataset_notes.md`) produces, from
+the same flat CAFs:
 
 1. `mcnu`: **all** neutrinos (every `rec.mc.nu`), with `position.{x,y,z}`, `E`, `momentum`, `pdg`, `iscc`,
    `genie_mode`, `w`, `Q2`, the particle counts, and the cohpi kinematics; weights optional.
 2. `mcprim`: the `rec.mc.nu.prim` table (pdg, genE, genp, start, end, length, contained).
-3. `evt`: every slice (not clear cosmic), with the selection stages as boolean columns instead of filtering,
+3. `slc`: every slice (not clear cosmic), with the selection stages as boolean columns instead of filtering,
    plus `tmatch_idx`, `tmatch_eff`, `tmatch_purity`.
-4. `pfp` (for Tier 2): every PFP of those slices with track score, length, direction, range momenta, chi2.
+4. `pfp` (for Tier 2): every PFP of those slices with track score, length, direction, range momenta, chi2,
+   shower energy and the truth-matched particle.
 
 Input sample list: `data/sample_lists/sbnd/prod_2026/v10_14_02_03/` in cafpyana (2,996 merged flat CAFs on
 dCache, `root://fndcadoor.fnal.gov`), the v10_14_02_03 BNB + cosmics CV production. The example df covers

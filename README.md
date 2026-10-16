@@ -28,7 +28,7 @@ pytest -q                                       # loader and training-table test
 - `xsum/data/` — file-level splits; torch datasets (M1+).
 - `xsum/models/`, `xsum/train/`, `xsum/eval/` — surrogate models, training loops, metrics (M1+).
 - `configs/data.yaml` — source df, truth and reco column lists, split settings.
-- `configs/cafpyana/xsum_surrogate.py` — draft cafpyana df-maker config for the full surrogate dataset.
+- `configs/cafpyana/analysis_village/xsum/` — cafpyana df-maker config for the full surrogate dataset (drop into a cafpyana checkout).
 - `docs/` — project design, dataset notes.
 - `scripts/` — environment, slimming, summaries.
 - `tests/` — tests on the slimmed cache.

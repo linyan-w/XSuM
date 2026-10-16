@@ -67,3 +67,32 @@ NC 1,131; 2p2h 1,121; cosmic 624.
 | `long_dirz − true_cos_theta_mu` | −0.010 | −0.001 | 0.006 |
 
 Muon contained 33 %, pion contained 76 %; correlation of `reco_t` with `true_t` is 0.23.
+
+# The kaon analysis dataframes (`kcv_reco`)
+
+`/pnfs/sbnd/scratch/users/twester/cafpyana_out/dfs/2026_09_23_192946__kcv_reco/`, 6,000 files, 9.1 GB,
+mounted on sbndbuild03; same v10_14_02_03 BNB + cosmics CV flat CAFs. Produced by
+`/exp/sbnd/app/users/twester/analysis/kaon/make_kaon_df.py` plus a second-stage converter. Per file (file 0):
+
+| key | one row is | rows |
+|---|---|---|
+| `true_type_0` | every true neutrino: `true_type` (1 K+→mu signal, 2 K+→pi, 3/4 other K+, 98 no K+ in FV, 99 out of FV), `is_cc, genie_mode, is_true_fv, true_E_nu, W, Q2, x, y, genie_inttype, target_pdg`, particle counts | 5,830 |
+| `slice_0` | every non-clear-cosmic FV slice: `nu_score, barycenterFM_score, tmatch_idx, vertex` | 6,676 |
+| `track_0` | every PFP of those slices: start/end, `trackScore`, length, chi2 (K, mu, p, pi; 3 planes), range P, truth match (pdg, G4ID, parent, interaction_id, genE, start/end) | 19,711 |
+| `pair_0`, `true_kaon_0` | kaon candidate pairs, true kaons | 2,578 / 123 |
+| `hdr_0`, `file_0`, `histpotdf_0`, `histgenevtdf_0` | triggers, provenance, POT | |
+
+Selection-free on the reco side (this is the Tier 1 / Tier 2 schema XSuM adopts), but the truth side keeps
+only labels and counts: the producer loads `rec.mc.nu.prim` and the vertex and drops `position`, `momentum`,
+`genp`, `start`, `end` before writing. 35 % of PFP rows have no track fit (`trackScore` = −5).
+In file 0: 1,882 / 5,830 neutrinos have a matched slice (1,057 / 1,267 in the FV).
+
+# The XSuM production (`configs/cafpyana/analysis_village/xsum/`)
+
+Runs on sbndbuild03 from `/pnfs/sbnd/persistent/users/lwan/dataframe/` (shallow clone of
+`sungbinoh/cafpyana` branch `feature/sungbin_technote_plots`, environment `xsum_env.sh`: cvmfs spack
+hdf5/xrootd/root + an existing py3.10 cafpyana venv, no new venv). Tables: `mcnu` (every neutrino, full
+`make_mcdf` truth + cohpi kinematics + `nuint_categ`), `mcprim` (every primary), `slc` (every non-clear-cosmic
+slice with the cohpi variables and selection stages `pass_*` as flags, `pass_cohpi` = full selection incl.
+sphere-charge and cathode-crosser cuts from the notebook, `in_sr` = signal region), `pfp` (every PFP within
+50 cm of the vertex: track, shower, chi2 incl. re-calibrated, truth match), `hdr`, `pot`.
