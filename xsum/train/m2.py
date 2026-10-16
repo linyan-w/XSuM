@@ -163,6 +163,43 @@ def cohpi_cutflow(df):
     return c
 
 
+class MLPClassifier:
+    """Softmax MLP on the standardised features; fast replacement for a many-class GBDT. sklearn-like API."""
+    def __init__(self, n_in, n_classes, hidden=256, n_layers=3, device="cuda", epochs=15, bs=8192, lr=2e-3, seed=0):
+        torch.manual_seed(seed)
+        layers, d = [], n_in
+        for _ in range(n_layers):
+            layers += [torch.nn.Linear(d, hidden), torch.nn.SiLU()]; d = hidden
+        self.net = torch.nn.Sequential(*layers, torch.nn.Linear(hidden, n_classes)).to(device)
+        self.device, self.epochs, self.bs, self.lr = device, epochs, bs, lr
+        self.classes_ = np.arange(n_classes)
+
+    def fit(self, X, y, Xv=None, yv=None):
+        opt = torch.optim.AdamW(self.net.parameters(), lr=self.lr, weight_decay=1e-5)
+        sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, self.epochs)
+        Xt = torch.tensor(X, dtype=torch.float32, device=self.device); yt = torch.tensor(y, dtype=torch.long, device=self.device)
+        best, best_state = np.inf, None
+        for ep in range(self.epochs):
+            self.net.train(); perm = torch.randperm(len(Xt), device=self.device)
+            for i in range(0, len(Xt), self.bs):
+                idx = perm[i:i + self.bs]
+                loss = torch.nn.functional.cross_entropy(self.net(Xt[idx]), yt[idx])
+                opt.zero_grad(); loss.backward(); opt.step()
+            sched.step()
+            if Xv is not None:
+                vl = -np.log(np.clip(self.predict_proba(Xv)[np.arange(len(yv)), yv], 1e-9, None)).mean()
+                if vl < best: best, best_state = vl, {k: v.clone() for k, v in self.net.state_dict().items()}
+        if best_state is not None: self.net.load_state_dict(best_state)
+        return self
+
+    @torch.no_grad()
+    def predict_proba(self, X):
+        self.net.eval(); out = []
+        for i in range(0, len(X), 65536):
+            out.append(torch.softmax(self.net(torch.tensor(X[i:i + 65536], dtype=torch.float32, device=self.device)), -1).cpu().numpy())
+        return np.concatenate(out)
+
+
 def train_flow(Ztr, Mtr, Ctr, Zva, Mva, Cva, epochs, device, hidden=512, n_layers=5, bs=4096, lr=1e-3, seed=0):
     torch.manual_seed(seed)
     model = FlowMatcher(Ztr.shape[1], Ctr.shape[1], hidden, n_layers).to(device)
@@ -221,8 +258,8 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
                                    "logloss": float(-np.log(np.clip(Pn[np.arange(len(Pn)), ncl[te]], 1e-9, None)).mean())}
     # topology: joint categorical over the PFP counts, sampled first and fed to every other component
     topo = Topology(T, tr & matched); ktrue = topo.encode(T)
-    heads["topology"] = gbdt(X[tr & matched], ktrue[tr & matched], seed, max_iter=400)
-    Pt = np.zeros((int((te & matched).sum()), topo.other + 1)); Pt[:, heads["topology"].classes_] = heads["topology"].predict_proba(X[te & matched])
+    heads["topology"] = MLPClassifier(C.shape[1], topo.other + 1, device=device, seed=seed).fit(C[tr & matched], ktrue[tr & matched], C[va & matched], ktrue[va & matched])
+    Pt = heads["topology"].predict_proba(C[te & matched])
     metrics["topology"] = {"n_classes": topo.other + 1, "frac_other_train": float((ktrue[tr & matched] == topo.other).mean()),
                            "logloss": float(-np.log(np.clip(Pt[np.arange(len(Pt)), ktrue[te & matched]], 1e-9, None)).mean()),
                            "logloss_marginal": float(-np.log(np.clip(np.bincount(ktrue[tr & matched], minlength=topo.other + 1)[ktrue[te & matched]] / (tr & matched).sum(), 1e-9, None)).mean()),
@@ -263,7 +300,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     # ---- closure on the test split: real vs generated slice blocks ---------------------------------------------
     tm = te & matched; idx = T.index[tm]
     rng = np.random.default_rng(seed)
-    Ptm = np.zeros((int(tm.sum()), topo.other + 1)); Ptm[:, heads["topology"].classes_] = heads["topology"].predict_proba(X[tm])
+    Ptm = heads["topology"].predict_proba(C[tm])
     kgen = (Ptm.cumsum(1) > rng.random(len(Ptm))[:, None]).argmax(1)
     XHg = np.concatenate([X[tm], topo.onehot(kgen)], 1); CHg = np.concatenate([C[tm], topo.onehot(kgen)], 1)
     Pg = {g: rng.random(int(tm.sum())) < heads[g].predict_proba(XHg)[:, 1] for g in GROUPS}
@@ -315,7 +352,9 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
     torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": CH.shape[1], "topology_classes": topo.classes, "hidden": hidden, "n_layers": n_layers,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": SPEC}, out / "model.pt")
-    import pickle; pickle.dump(heads, open(out / "heads.pkl", "wb"))
+    import pickle
+    topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1], "n_classes": topo.other + 1}, out / "topology_head.pt")
+    pickle.dump(heads, open(out / "heads.pkl", "wb"))
     metrics["runtime_s"] = time.time() - t0
     (out / "metrics.json").write_text(json.dumps(metrics, indent=1, default=float))
     print(f"done in {metrics['runtime_s']:.0f} s -> {out}", flush=True)

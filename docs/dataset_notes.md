@@ -101,8 +101,13 @@ file (3.7 kB per event). Output files `<prefix>_chunkN.df` hold keys `<table>_<k
 Input samples:
 
 - cafpyana sample list `prod_2026/v10_14_02_03/..._flatcaf_sbnd_merged.txt`: 2,996 merged flat CAFs on
-  sungbino's dCache scratch; by 2026-10-16 only 1,633 still existed (scratch is purged). First production
-  uses those (about 5.4 M events, 55 % of the sample).
+  sungbino's dCache scratch; by 2026-10-16 only 1,633 still existed (scratch is purged), and `flatcaf_587.root`
+  is truncated (82 MB, unreadable). First production (`prod_v10_14_02_03_scratch1633`, six chunk files,
+  18.6 GB, 1,632 files, about 5.4 M triggers, 9.8 M neutrinos) is in
+  `/pnfs/sbnd/persistent/users/lwan/dataframe/prod_v10_14_02_03_scratch1633/`. It was made with the module
+  version of commit a62f032 (kept in the clone as `analysis_village/xsum_v1`): no `mcdaught`, PFPs within 50 cm
+  of the vertex only, no kaon PID branches. Chunk 0 had to be rerun: a pool worker died and cafpyana's pool
+  never returns when a task is lost.
 - SAM definition `aurora_SBND2026A_gen2_BNBLight_prodgenie_corsika_proton_rockbox0p1_sbnd_CV_v10_14_02_03_flatcaf_sbnd`
   (sbndpro, 2026-03-02): 749,262 unmerged flat CAFs, 7.9 TB, 9,935,524 events, on
   `/pnfs/fnal.gov/usr/sbn/data_add/sbn_nd/aurora/mc/v10_14_02_03/...`, xrootd URLs via
