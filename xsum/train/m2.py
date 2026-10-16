@@ -362,7 +362,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
     plots.save(fig, out / "figures" / "m2_marginals.png")
     gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
-    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": CH.shape[1], "topology_classes": topo.classes, "hidden": hidden, "n_layers": n_layers,
+    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": CH.shape[1], "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": SPEC}, out / "model.pt")
     import pickle
     topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1], "n_classes": topo.other + 1}, out / "topology_head.pt")

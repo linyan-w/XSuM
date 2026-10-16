@@ -179,6 +179,14 @@ and for true signal; this is the kind of comparison the analysers will make on t
 \begin{table}[h]\centering\input{m2_cutflow.tex}\caption{cohpi cut flow recomputed on real and generated test slices.}\label{tab:m2cut}\end{table}
 
 \small\input{m2_columns.tex}\normalsize
+
+\paragraph{Generation.} \texttt{scripts/generate\_slc.py} loads the trained surrogate and writes slice records
+for any truth table: slice cardinality (0, 1 or 2 per neutrino) from its head, then topology, presence, point
+masses and the flow, then the production column names, plus the recomputed cohpi flags. On the 814,028 test
+neutrinos of the five chunks it generates 269,841 slices in 66\,s on one GPU (about 12,000 neutrinos per second,
+so the full official sample takes a quarter of an hour), with the slice-multiplicity fractions (0 / 1 / 2 slices:
+68.0 / 31.0 / 1.1\%) reproduced to 0.1\% and 422 slices passing the full cohpi selection against 423 for
+\real{} (216 against 220 in the signal region).
 \FloatBarrier
 
 \section{Outlook}
