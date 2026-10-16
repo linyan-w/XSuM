@@ -4,6 +4,10 @@ Status: repository scaffold and data audit (2026-10-16). Sections 9 and 10 list 
 Sister project: `opendata-sim2reco` (MINERvA open data); the design below follows it where the two detectors
 allow, and departs where SBND's LArTPC reconstruction and the cafpyana analysis chain differ.
 
+![inputs and outputs](figures/io_schematic.svg)
+
+*Inputs (truth that enters the detector), what the surrogate generates (the cafpyana `slc` and `pfp` records), what is recomputed downstream. Source: `docs/figures/io_schematic.svg`.*
+
 ## 1. Goal
 
 Learn, from SBND MC alone, a **per-event stochastic map from GENIE final-state truth to the reconstructed

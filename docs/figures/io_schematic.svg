@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="640" viewBox="0 0 1180 640" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker>
+  </defs>
+  <style>
+    .box{stroke:#444;stroke-width:1.2;rx:6}
+    .in{fill:#e3f0fb}.model{fill:#fdf1dc}.out{fill:#e4f4e8}.no{fill:#f5f5f5;stroke-dasharray:5 4}.down{fill:#f3e8f6}
+    .h{font-weight:bold;font-size:14px}.s{font-size:11.5px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}
+  </style>
+
+  <text x="20" y="28" class="h" font-size="17">XSuM: what goes in, what the surrogate generates</text>
+  <text x="20" y="48" class="cap">one row of the diagram = one true neutrino interaction; tables are the XSuM cafpyana dataframes (mcnu, mcprim, mcdaught, slc, pfp)</text>
+
+  <!-- INPUTS -->
+  <text x="20" y="90" class="h">INPUTS  X, c  (detector-causal truth)</text>
+  <rect x="20" y="100" width="300" height="118" class="box in"/>
+  <text x="32" y="120" class="h">Primary particle set  X   [mcprim]</text>
+  <text x="32" y="140" class="s">post-FSI GENIE primaries, variable size</text>
+  <text x="32" y="156" class="s">per particle: species, (px, py, pz)</text>
+  <text x="32" y="172" class="s">mu, e, p, n, pi+-, pi0, gamma, K, hyperons</text>
+  <text x="32" y="188" class="s">drop: outgoing neutrinos, nuclear remnants</text>
+  <text x="32" y="206" class="s">(M1/M2: 80 fixed features derived from X; M3: tokens)</text>
+
+  <rect x="20" y="232" width="300" height="70" class="box in"/>
+  <text x="32" y="252" class="h">Context  c   [mcnu]</text>
+  <text x="32" y="272" class="s">true vertex (x, y, z): TPC, distance to cathode and walls</text>
+  <text x="32" y="290" class="s">(later: beam/detector conditions if they matter)</text>
+
+  <rect x="20" y="316" width="300" height="92" class="box in"/>
+  <text x="32" y="336" class="h">Geant4 daughters   [mcdaught]  (optional)</text>
+  <text x="32" y="356" class="s">decay / interaction products of each primary</text>
+  <text x="32" y="372" class="s">used for labels and studies (K+ -> mu+, pi0 -> gg),</text>
+  <text x="32" y="388" class="s">not a model input in v1: only X and c enter the detector</text>
+
+  <rect x="20" y="424" width="300" height="88" class="box no"/>
+  <text x="32" y="444" class="h" fill="#777">NEVER inputs</text>
+  <text x="32" y="464" class="s">genie_mode, iscc, nuint_categ, W, Q2, x, y, E_nu,</text>
+  <text x="32" y="480" class="s">target nucleon, signal flags</text>
+  <text x="32" y="498" class="s">kept in [labels] for holdout tests only</text>
+
+  <!-- MODEL -->
+  <text x="400" y="90" class="h">SURROGATE  p(R | X, c)</text>
+  <rect x="400" y="100" width="300" height="412" class="box model"/>
+  <text x="412" y="122" class="h">encoder</text>
+  <text x="412" y="140" class="s">M1/M2: standardised feature vector</text>
+  <text x="412" y="156" class="s">M3: set transformer over particle tokens + context token</text>
+
+  <text x="412" y="190" class="h">Tier 0  slice cardinality</text>
+  <text x="412" y="208" class="s">p(N_slices = 0, 1, 2+ | X, c)   [GBDT -> head]</text>
+  <text x="412" y="224" class="s">group presence: short track, two-track topology,</text>
+  <text x="412" y="240" class="s">charge in 1-4 cm spheres, containment flags</text>
+
+  <text x="412" y="274" class="h">Tier 1  slice block  (~50 numbers)</text>
+  <text x="412" y="292" class="s">conditional flow matching, per-event dim mask</text>
+  <text x="412" y="308" class="s">robust standardisation, log / dequantised counts</text>
+
+  <text x="412" y="342" class="h">Tier 2  PFP set  (variable size)   [M4]</text>
+  <text x="412" y="360" class="s">p(N_pfp | z) then equivariant set flow over PFPs</text>
+  <text x="412" y="376" class="s">cross-attending to the particle tokens</text>
+
+  <text x="412" y="410" class="h">Uncertainty</text>
+  <text x="412" y="428" class="s">Bayesian last layers / ensembles -> epistemic flag</text>
+  <text x="412" y="444" class="s">per generated record (out-of-support warning)</text>
+
+  <text x="412" y="478" class="h">Validation</text>
+  <text x="412" y="496" class="s">physics-defined holdouts (t, E, angle, multiplicity, TPC)</text>
+
+  <!-- OUTPUTS -->
+  <text x="780" y="90" class="h">GENERATED  R  (same dataframe format)</text>
+  <rect x="780" y="100" width="380" height="250" class="box out"/>
+  <text x="792" y="120" class="h">slc row per generated slice   [slc]</text>
+  <text x="792" y="140" class="s">vertex (3), nu_score, bcfm_score, total_pe</text>
+  <text x="792" y="156" class="s">n_pfp, n_prong, n_trk, n_proton, n_shower</text>
+  <text x="792" y="172" class="s">longest / second track: direction (3), length, PID,</text>
+  <text x="792" y="188" class="s">   chi2 mu / p (old and re-calibrated)</text>
+  <text x="792" y="204" class="s">two-track block: reco_t, opening angle, range p_mu, p_pi,</text>
+  <text x="792" y="220" class="s">   start / end points (12), containment flags</text>
+  <text x="792" y="236" class="s">charge in 1, 2, 3, 4 cm spheres (hit-level, generated directly)</text>
+  <text x="792" y="262" class="h">pfp rows per generated slice   [pfp]   (M4)</text>
+  <text x="792" y="282" class="s">trackScore, dist_to_vertex, parent link, start/end/dir, length,</text>
+  <text x="792" y="298" class="s">range and MCS momenta (mu, pi, p, K), chi2 mu/p/pi/K on 3 planes,</text>
+  <text x="792" y="314" class="s">shower energy, dE/dx, open angle</text>
+  <text x="792" y="334" class="s">truth match columns are copied from the generating neutrino</text>
+
+  <rect x="780" y="366" width="380" height="60" class="box no"/>
+  <text x="792" y="386" class="h" fill="#777">NOT generated, recomputed downstream</text>
+  <text x="792" y="404" class="s">selection flags (pass_*), BDT scores, |t| from generated momenta</text>
+  <text x="792" y="418" class="s">cosmic-only slices: independent of the neutrino model, reused from MC</text>
+
+  <!-- DOWNSTREAM -->
+  <rect x="780" y="442" width="380" height="70" class="box down"/>
+  <text x="792" y="462" class="h">Downstream (collaborators)</text>
+  <text x="792" y="482" class="s">cohpi (S. Oh) and kaon (T. Wester) analyses run unchanged on the</text>
+  <text x="792" y="498" class="s">surrogated dataframes and compare with the real chain</text>
+
+  <!-- arrows -->
+  <line x1="320" y1="160" x2="400" y2="200" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="320" y1="267" x2="400" y2="240" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="700" y1="200" x2="780" y2="170" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="700" y1="300" x2="780" y2="230" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="700" y1="360" x2="780" y2="290" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="970" y1="350" x2="970" y2="366" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+  <line x1="970" y1="426" x2="970" y2="442" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+
+  <!-- training data -->
+  <rect x="20" y="540" width="1140" height="80" class="box" fill="#fff"/>
+  <text x="32" y="560" class="h">Training data  (truth and reco linked by tmatch_idx / interaction_id)</text>
+  <text x="32" y="580" class="s">SBND 2026 gen2 BNB + cosmics CV, v10_14_02_03. Now: 1,633 merged flat CAFs, ~9.5 M neutrinos (~1.7 M in the FV), 2.6 M matched slices, ~2,500 cohpi-selected.</text>
+  <text x="32" y="596" class="s">Coming: the official SAM definition, 749,262 flat CAFs, 9.94 M events, as 2,000 grid jobs. Splits are by input file, never by row. Holdouts are physics regions.</text>
+  <text x="32" y="612" class="s">Milestones: M0 data (done) - M1 baselines (running) - M2 slice-block flow (code ready) - M3 particle-set encoder - M4 PFP set + uncertainty.</text>
+</svg>

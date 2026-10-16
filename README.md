@@ -10,6 +10,10 @@ Status: M0 (data audit, slimming, training table, file-level splits) on the cohp
 [`docs/PROJECT.md`](docs/PROJECT.md) for the design and [`docs/dataset_notes.md`](docs/dataset_notes.md) for
 what is in the example dataframe.
 
+## Inputs and outputs
+
+![inputs and outputs](docs/figures/io_schematic.svg)
+
 ## Quick start
 
 ```

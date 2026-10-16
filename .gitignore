@@ -17,8 +17,10 @@ outputs/
 *.npz
 *.log
 reports/*/model.pt
+reports/*/*.parquet
 reports/*/train.log
 # internal technotes/papers dropped into the working directory
 *.pdf
 # internal technotes (not for GitHub)
 reference/
+*.pkl
