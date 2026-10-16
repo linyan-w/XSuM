@@ -190,6 +190,27 @@ so the full official sample takes a quarter of an hour), with the slice-multipli
 \real{} (216 against 220 in the signal region).
 \FloatBarrier
 
+\section{First surrogated dataset for the analysers}
+\label{sec:dataset}
+
+\texttt{scripts/write\_surrogate\_df.py} turns the generated slices into files in the production format, so
+that existing cafpyana-based analysis code runs on them unchanged. The first dataset,
+\texttt{surrogate\_v3\_6ch}, applies the six-chunk M2 v3 model to the 9,774,979 true neutrinos of the scratch
+production (the training sample itself; comparisons with the real chain must use the test files listed in
+\texttt{file\_splits.parquet}, 10\% of the input files chosen by file):
+\begin{itemize}
+\item location: \texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_v3\_6ch/}, six files
+      \texttt{xsum\_surrogate\_chunkN.df} (11\,GB), world-readable; the real production it mirrors is in
+      \texttt{prod\_v10\_14\_02\_03\_scratch1633/} (18\,GB) next to it;
+\item keys per file: \texttt{mcnu\_0, mcprim\_0, hdr\_0, histpotdf\_0, histgenevtdf\_0, pot\_0} copied from the
+      production, \texttt{slc\_0} generated (index \texttt{(\_\_ntuple, entry, rec.slc..index)},
+      \texttt{tmatch\_idx} = generating neutrino, \texttt{tmatch\_eff} / \texttt{tmatch\_purity} NaN, the cohpi
+      \texttt{pass\_*} and \texttt{in\_sr} flags recomputed from the generated variables, plus
+      \texttt{surrogate\_topology\_class}), \texttt{provenance};
+\item content: 3,241,308 generated slices (13\,min of generation), of which 5,252 pass the full cohpi selection and
+      2,759 are in the signal region; no \texttt{pfp} table yet (M4), no cosmic-only slices (to be taken from the MC).
+\end{itemize}
+
 \section{Outlook}
 \label{sec:outlook}
 
