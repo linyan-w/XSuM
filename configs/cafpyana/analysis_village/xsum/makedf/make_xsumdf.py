@@ -178,8 +178,8 @@ def make_xsum_slcdf(f):
         two_order = two.sort_values(by=("pfp", "trk", "len", "", "", ""), ascending=False)
         muondf = two_order.groupby(level=[0, 1]).nth(0)
         cpidf = two_order.groupby(level=[0, 1]).nth(1)
-        slcdf["is_muon_contained"] = g(is_contained(muondf))
-        slcdf["is_cpi_contained"] = g(is_contained(cpidf))
+        slcdf["is_muon_contained"] = g(is_contained(muondf)).astype(float)
+        slcdf["is_cpi_contained"] = g(is_contained(cpidf)).astype(float)
         for tag, d in (("muon", muondf), ("cpi", cpidf)):
             spec = {f"{tag}_{e}_{a}": ("pfp", "trk", e, a) for e in ("start", "end") for a in ("x", "y", "z")}
             slcdf = slcdf.join(pick(d, spec).groupby(level=[0, 1]).first())
