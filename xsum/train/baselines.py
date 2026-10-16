@@ -31,12 +31,15 @@ def gbdt(Xtr, ytr, seed=0, max_iter=500):
 
 
 class Standardizer:
+    """arcsinh then z-score; float32 throughout so that an 8M x 80 matrix costs 2.6 GB, not 6."""
     def __init__(self, X):
-        Xa = np.arcsinh(X)
-        self.m, self.s = Xa.mean(0), Xa.std(0) + 1e-6
+        Xa = np.arcsinh(np.asarray(X, dtype=np.float32))
+        self.m, self.s = Xa.mean(0, dtype=np.float64).astype(np.float32), (Xa.std(0, dtype=np.float64) + 1e-6).astype(np.float32)
 
     def __call__(self, X):
-        return ((np.arcsinh(X) - self.m) / self.s).astype(np.float32)
+        out = np.arcsinh(np.asarray(X, dtype=np.float32))
+        out -= self.m; out /= self.s
+        return out
 
 
 def train_mdn(Xtr, Ytr, Xva, Yva, n_components=8, epochs=60, bs=4096, lr=2e-3, device="cuda", seed=0, clip=25.0):

@@ -239,7 +239,8 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     t0 = time.time()
     tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
     F = pd.read_parquet(f"{table_dir}/features.parquet")
-    T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=tcols).astype(np.float32)
+    T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=tcols)
+    for c in T.columns: T[c] = T[c].astype(np.float32)   # column by column: no full float64 copy
     L = pd.read_parquet(f"{table_dir}/labels.parquet", columns=["is_signal_cohpi"])
     if max_rows and len(F) > max_rows:
         keep = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, T, L = F.iloc[keep], T.iloc[keep], L.iloc[keep]
