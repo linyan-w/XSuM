@@ -18,7 +18,9 @@ TABLES = ("mcnu", "mcprim", "slc", "pfp", "hdr", "pot", "histpotdf", "histgenevt
 
 
 def chunk_id(path: str) -> int:
-    m = re.search(r"chunk(\d+)\.df$", os.path.basename(path))
+    """Chunk number from '<prefix>_chunkN.df' (pool production) or '<prefix>_N.df' (grid job N)."""
+    b = os.path.basename(path)
+    m = re.search(r"chunk(\d+)\.df$", b) or re.search(r"_(\d+)\.df$", b)
     return int(m.group(1)) if m else 0
 
 

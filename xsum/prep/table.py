@@ -85,6 +85,7 @@ def production_table(mcnu: pd.DataFrame, slc: pd.DataFrame) -> pd.DataFrame:
     entry_levels = nu_levels[:-1]
     key = pd.MultiIndex.from_arrays([slc.index.get_level_values(n) for n in entry_levels] + [slc["tmatch_idx"].astype(int).values], names=nu_levels)
     s = slc.copy()
+    s["slc_index"] = slc.index.get_level_values(slc.index.names[-1]).to_numpy()
     s.index = key
     s = s[s.index.isin(mcnu.index)]
     n_matched = s.groupby(level=nu_levels).size()
@@ -94,7 +95,7 @@ def production_table(mcnu: pd.DataFrame, slc: pd.DataFrame) -> pd.DataFrame:
     table = pd.DataFrame(index=mcnu.index)
     table["matched"] = table.index.isin(s.index).astype(np.int8)
     table["n_matched_slices"] = n_matched.reindex(table.index).fillna(0).astype(np.int8)
-    table = table.join(s[cols], how="left")
+    table = table.join(s[cols + ["slc_index"]], how="left")
     for c in cols:
         if table[c].dtype == object or table[c].dtype == bool:
             table[c] = table[c].astype(float)
