@@ -24,8 +24,14 @@ def chunk_id(path: str) -> int:
     return int(m.group(1)) if m else 0
 
 
-def read_table(path: str, table: str) -> pd.DataFrame:
-    """Concatenate all splits of one table in one chunk file; adds a leading 'chunk' index level."""
+def read_table(path: str, table: str, slc_dir: Optional[str] = None) -> pd.DataFrame:
+    """Concatenate all splits of one table in one chunk file; adds a leading 'chunk' index level.
+
+    slc_dir (or env XSUM_SLC_DIR): directory of repaired `slc` sidecar files with the same basenames
+    (see xsum.prep.repair); when given, the slc table is read from there instead of the production file."""
+    slc_dir = slc_dir or os.environ.get("XSUM_SLC_DIR")
+    if table == "slc" and slc_dir and os.path.exists(os.path.join(slc_dir, os.path.basename(path))):
+        path, cid = os.path.join(slc_dir, os.path.basename(path)), chunk_id(path)
     with pd.HDFStore(path, mode="r") as st:
         keys = sorted((k for k in st.keys() if re.fullmatch(rf"/{table}_\d+", k)), key=lambda k: int(k.rsplit("_", 1)[1]))
         parts = [st[k] for k in keys]

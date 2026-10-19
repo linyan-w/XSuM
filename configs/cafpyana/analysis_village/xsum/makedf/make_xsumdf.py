@@ -147,17 +147,19 @@ def make_xsum_slcdf(f):
         return pd.DataFrame()
     g = lambda s: make_slc_var(s)
 
+    near50 = all_df.pfp.dist_to_vertex < 50.
     slcdf = pd.DataFrame({
         "is_fv": g(InFV_nohiyz(all_df.slc.vertex)),
         "bcfm_score": g(all_df.slc.barycenterFM.score),
         "nu_score": g(all_df.slc.nu_score),
         "is_not_clear_cosmic": g(all_df.slc.is_clear_cosmic == 0),
         "n_pfp": all_df.groupby(level=[0, 1]).size(),
-        "n_pfp_50cm": (all_df.pfp.dist_to_vertex < 50.).groupby(level=[0, 1]).sum(),
-        "n_prong": all_df.pfp.is_prong_candidate.groupby(level=[0, 1]).sum(),
-        "n_trk": all_df.pfp.is_trk_candidate.groupby(level=[0, 1]).sum(),
-        "n_proton": all_df.pfp.is_proton_candidate.groupby(level=[0, 1]).sum(),
-        "n_shower": all_df.pfp.is_shower_candidate.groupby(level=[0, 1]).sum(),
+        "n_pfp_50cm": near50.groupby(level=[0, 1]).sum(),
+        # cohpi multiplicities are defined on PFPs within 50 cm of the vertex (make_pandora_df_calo_update's trkDistCut)
+        "n_prong": (all_df.pfp.is_prong_candidate & near50).groupby(level=[0, 1]).sum(),
+        "n_trk": (all_df.pfp.is_trk_candidate & near50).groupby(level=[0, 1]).sum(),
+        "n_proton": (all_df.pfp.is_proton_candidate & near50).groupby(level=[0, 1]).sum(),
+        "n_shower": (all_df.pfp.is_shower_candidate & near50).groupby(level=[0, 1]).sum(),
         "tmatch_idx": g(all_df.slc.tmatch.idx),
         "tmatch_eff": g(all_df.slc.tmatch.eff),
         "tmatch_purity": g(all_df.slc.tmatch.pur),
