@@ -173,3 +173,12 @@ Training tables: built on sbndbuild03 with `scripts/postgrid_official.sh` in 20 
 4.2 GB of Parquet, merged here with `scripts/merge_table_groups.py` into
 `data/prod_v10_14_02_03_official/table/` (index level `chunk` = job number). The raw files are not kept on
 this machine.
+
+**Known defect of the official production and its repair.** The module version used on the grid (commits
+after the all-PFP change) counted `n_shower` over all PFPs of a slice instead of those within 50 cm of the
+vertex, so `pass_2trk` never fired and the slice two-track block (`reco_t`, `opening_angle`, containment,
+`muon_*`/`cpi_*` points, `range_p_*`) and the `pass_*` flags are empty in `prod_v10_14_02_03_official`. The
+`pfp`, `mcnu`, `mcprim`, `mcdaught` and the rest of `slc` are correct. `xsum.prep.repair.repair_slc` rebuilds
+the block from `pfp` exactly as cafpyana does; `scripts/repair_official_slc.py` writes repaired `slc` sidecar
+files (`prod_v10_14_02_03_official_slcfix/` on persistent) which the loader uses when `XSUM_SLC_DIR` points
+at them. The scratch production (module v1) is not affected. The module is fixed for future productions.
