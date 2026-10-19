@@ -16,19 +16,23 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     dirs = sorted(d for d in glob.glob(f"{a.groups}/group_*") if os.path.exists(f"{d}/targets.parquet"))
     import numpy as np
+    import pyarrow as pa
+    import pyarrow.parquet as pq
     for name in ("features", "labels", "targets"):
-        if os.path.exists(f"{a.out}/{name}.parquet") and not a.force:
+        out = f"{a.out}/{name}.parquet"
+        if os.path.exists(out) and not a.force:
             print(name, "exists, skipped"); continue
-        parts = []
+        # stream group by group into one Parquet file (one row group per input group): memory = one group
+        writer, n = None, 0
         for d in dirs:
             df = pd.read_parquet(f"{d}/{name}.parquet")
-            if name == "targets":                      # float64 -> float32 column by column (half the memory)
+            if name == "targets":
                 for c in df.columns:
                     if df[c].dtype == np.float64: df[c] = df[c].astype(np.float32)
-            parts.append(df)
-        df = pd.concat(parts, copy=False); del parts   # rows are unique by construction (job number in the index); no sort
-        df.to_parquet(f"{a.out}/{name}.parquet"); print(name, df.shape, f"from {len(dirs)} groups", flush=True); del df
-
+            t = pa.Table.from_pandas(df, preserve_index=True); del df
+            if writer is None: writer = pq.ParquetWriter(out, t.schema)
+            writer.write_table(t); n += t.num_rows; del t
+        writer.close(); print(name, n, "rows from", len(dirs), "groups", flush=True)
 
 if __name__ == "__main__":
     main()
