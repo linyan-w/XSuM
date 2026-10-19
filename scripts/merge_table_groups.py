@@ -12,12 +12,21 @@ import pandas as pd
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("groups"); ap.add_argument("out"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("groups"); ap.add_argument("out"); ap.add_argument("--force", action="store_true"); a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     dirs = sorted(d for d in glob.glob(f"{a.groups}/group_*") if os.path.exists(f"{d}/targets.parquet"))
+    import numpy as np
     for name in ("features", "labels", "targets"):
-        df = pd.concat([pd.read_parquet(f"{d}/{name}.parquet") for d in dirs])
-        df = df[~df.index.duplicated(keep="first")].sort_index()
+        if os.path.exists(f"{a.out}/{name}.parquet") and not a.force:
+            print(name, "exists, skipped"); continue
+        parts = []
+        for d in dirs:
+            df = pd.read_parquet(f"{d}/{name}.parquet")
+            if name == "targets":                      # float64 -> float32 column by column (half the memory)
+                for c in df.columns:
+                    if df[c].dtype == np.float64: df[c] = df[c].astype(np.float32)
+            parts.append(df)
+        df = pd.concat(parts, copy=False); del parts   # rows are unique by construction (job number in the index); no sort
         df.to_parquet(f"{a.out}/{name}.parquet"); print(name, df.shape, f"from {len(dirs)} groups", flush=True); del df
 
 
