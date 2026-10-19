@@ -158,3 +158,18 @@ recomputed, `surrogate_topology_class` added), plus `file_splits.parquet` (train
 same rule and seed as training). Comparisons with the real chain should use the test files only.
 First dataset: `surrogate_v3_6ch` (M2 v3 trained on all six scratch chunks, applied to the same 9.8 M
 neutrinos), in `/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_v3_6ch/` once written. No `pfp` table yet.
+
+# The official production (`prod_v10_14_02_03_official`)
+
+2,000 grid jobs over the SAM definition (375 flat CAFs each, pilot excluded), submitted 2026-10-16 12:05,
+all finished by 2026-10-17; archived with their logs in
+`/pnfs/sbnd/persistent/users/lwan/dataframe/prod_v10_14_02_03_official/` (2,000 `xsum_v10_14_02_03_N.df`,
+79 GB, world-readable; the pilot's 375 files are in `.../cafpyana_out/dfs/2026_10_16_092446__xsum_pilot/` on
+scratch). 3,284 of the 749,262 input files (0.44 %) were skipped by 461 jobs: about 3,000 failed to copy to
+the worker (`No such file` after xrdcp), about 300 are unreadable (`expected Chunk of length ...`); both
+lists are recoverable from the job logs for a small follow-up submission. Each file holds the full schema
+(`mcnu, mcprim, mcdaught, slc, pfp, hdr, pot, histpotdf, histgenevtdf`; about 42 MB, 46 % of it `mcdaught`).
+Training tables: built on sbndbuild03 with `scripts/postgrid_official.sh` in 20 groups (job number modulo 20),
+4.2 GB of Parquet, merged here with `scripts/merge_table_groups.py` into
+`data/prod_v10_14_02_03_official/table/` (index level `chunk` = job number). The raw files are not kept on
+this machine.
