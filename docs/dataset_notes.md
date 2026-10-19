@@ -171,8 +171,9 @@ lists are recoverable from the job logs for a small follow-up submission. Each f
 (`mcnu, mcprim, mcdaught, slc, pfp, hdr, pot, histpotdf, histgenevtdf`; about 42 MB, 46 % of it `mcdaught`).
 Training tables: built on sbndbuild03 with `scripts/postgrid_official.sh` in 20 groups (job number modulo 20),
 4.2 GB of Parquet, merged here with `scripts/merge_table_groups.py` into
-`data/prod_v10_14_02_03_official/table/` (index level `chunk` = job number). The raw files are not kept on
-this machine.
+`data/prod_v10_14_02_03_official/table/` (index level `chunk` = job number; built from the repaired `slc`
+sidecars): 17,861,754 neutrinos, 5,736,854 with a matched slice, 297,889 with the two-track topology in the FV,
+6,095 passing the full cohpi selection. The raw files are not kept on this machine.
 
 **Known defect of the official production and its repair.** The module version used on the grid (commits
 after the all-PFP change) counted `n_shower` over all PFPs of a slice instead of those within 50 cm of the
