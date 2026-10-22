@@ -1,0 +1,140 @@
+"""M4: the PFP set of a slice. Conditioned on the truth features, the topology class and the slice block, a
+classifier head gives the number of fitted PFPs (and of empty ones), a masked set flow generates their records.
+Closure: per-field marginals and the cohpi multiplicities recomputed from generated PFPs against the real ones.
+"""
+from __future__ import annotations
+
+import glob
+import json
+import pathlib
+import pickle
+import time
+
+import numpy as np
+import pandas as pd
+import torch
+
+from ..data.pfpset_tf import PfpTransform
+from ..data.splits import split_by_level
+from ..eval import plots
+from ..eval.metrics import sample_vs_real_1d
+from ..models.pfpflow import PfpFlow
+from ..prep.pfpset import FIELDS, N_MAX, NAMES
+from .baselines import Standardizer
+from .m2 import SPEC, TOPO_COLS, BlockTransform, MLPClassifier, Topology, mask_from_presence, presence
+
+N_EMPTY_MAX = 3
+
+
+def load_sets(pfpsets_dir):
+    parts = [np.load(f) for f in sorted(glob.glob(f"{pfpsets_dir}/group_*.npz"))]
+    return {k: np.concatenate([p[k] for p in parts]) for k in ("key", "X", "n_fit", "n_empty", "truth_pdg")}
+
+
+def cohpi_counts(X, valid):
+    """n_prong, n_trk, n_proton, n_shower from a raw PFP-set array (cohpi definitions on PFPs within 50 cm)."""
+    g = lambda n: X[..., NAMES.index(n)]
+    has_trk = (g("has_trk") > 0.5) & valid; near50 = (g("dist_to_vertex") < 50) & valid
+    near = has_trk & (g("dist_to_vertex") < 6) & (g("trk_len") > 4)
+    trk = near & (g("trackScore") > 0.5)
+    return {"n_prong": near.sum(1), "n_trk": trk.sum(1), "n_proton": (trk & (g("chi2_mu_new") > 25)).sum(1), "n_shower": (near50 & (g("trackScore") < 0.5)).sum(1)}
+
+
+def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_slices=3_000_000, d_model=192, n_layers=4, bs=1024, lr=5e-4):
+    out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True); t0 = time.time()
+    S = load_sets(pfpsets_dir)
+    T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=[c for c, _, _ in SPEC] + TOPO_COLS)
+    F = pd.read_parquet(f"{table_dir}/features.parquet")
+    # align sets with the table rows by neutrino key
+    kidx = pd.MultiIndex.from_arrays([S["key"][:, i] for i in range(4)], names=T.index.names)
+    pos = T.index.get_indexer(kidx); ok = pos >= 0
+    print(f"sets {len(kidx)}, table {len(T)}, aligned {ok.sum()}  ({time.time()-t0:.0f} s)", flush=True)
+    rng = np.random.default_rng(seed)
+    sel = np.flatnonzero(ok)
+    if max_slices and len(sel) > max_slices: sel = np.sort(rng.choice(sel, max_slices, replace=False))
+    X = S["X"][sel]; n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
+    T = T.iloc[pos[sel]]; F = F.iloc[pos[sel]]; del S
+    file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
+    sp = split_by_level(pd.MultiIndex.from_arrays([file_id], names=["file"]), level="file", seed=seed); tr, va, te = sp["train"], sp["val"], sp["test"]
+    # conditioning: features, topology one-hot, slice block
+    std = Standardizer(F.to_numpy(np.float32)[tr]); C = std(F.to_numpy(np.float32)); del F
+    topo = Topology(T, tr); k = topo.encode(T); H = topo.onehot(k)
+    bt = BlockTransform(); Y = bt.matrix(T).astype(np.float32); bt.fit(Y[tr]); Z, Mfin = bt.standardise(Y); del Y
+    Mg = mask_from_presence(presence(T, bt), bt) * Mfin; Zc = Z * Mg
+    cond = np.concatenate([C, H, Zc], 1).astype(np.float32); del C, H, Zc, Z, Mg, Mfin
+    print(f"cond dim {cond.shape[1]}, train {tr.sum()} val {va.sum()} test {te.sum()}  ({time.time()-t0:.0f} s)", flush=True)
+    metrics = {"n": int(len(cond)), "cond_dim": int(cond.shape[1]), "epochs": epochs, "d_model": d_model, "n_layers": n_layers}
+
+    # heads: number of fitted PFPs and of empty PFPs
+    heads = {}
+    for name, y, K in (("n_fit", n_fit, N_MAX + 1), ("n_empty", n_empty, N_EMPTY_MAX + 1)):
+        heads[name] = MLPClassifier(cond.shape[1], K, device=device, seed=seed).fit(cond[tr], y[tr], cond[va], y[va])
+        P = heads[name].predict_proba(cond[te])
+        metrics[name] = {"logloss": float(-np.log(np.clip(P[np.arange(len(P)), y[te]], 1e-9, None)).mean()),
+                         "logloss_marginal": float(-np.log(np.clip((np.bincount(y[tr], minlength=K) / tr.sum())[y[te]], 1e-9, None)).mean()),
+                         "accuracy": float((P.argmax(1) == y[te]).mean()), "marginal_true": np.bincount(y[te], minlength=K).tolist(), "mean_prob": P.mean(0).tolist()}
+        print(name, {kk: round(v, 4) for kk, v in metrics[name].items() if isinstance(v, float)}, flush=True)
+
+    # set flow
+    pt = PfpTransform().fit(X[tr], seed); Zs, valid = pt.forward(X, rng)
+    model = PfpFlow(Zs.shape[-1], cond.shape[1], d_model, n_layers).to(device)
+    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5); sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, epochs)
+    itr, iva = np.flatnonzero(tr), np.flatnonzero(va)
+    def batch(idx):
+        return (torch.tensor(Zs[idx], device=device), torch.tensor(cond[idx], device=device), torch.tensor(valid[idx], device=device))
+    hist, best, best_state = [], np.inf, None
+    for ep in range(epochs):
+        model.train(); perm = rng.permutation(itr); tl = 0.0; nb = 0
+        for i in range(0, len(perm), bs):
+            z, c, m = batch(perm[i:i + bs]); loss = model.loss(z, c, m)
+            opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step(); tl += loss.item(); nb += 1
+        sched.step(); model.eval()
+        with torch.no_grad():
+            vl = float(np.mean([model.loss(*batch(iva[i:i + 8192])).item() for i in range(0, len(iva), 8192)]))
+        hist.append({"epoch": ep, "train": tl / max(nb, 1), "val": vl}); print(f"epoch {ep:3d} train {tl / max(nb, 1):.4f} val {vl:.4f}", flush=True)
+        if vl < best: best, best_state = vl, {kk: v.clone() for kk, v in model.state_dict().items()}
+    model.load_state_dict(best_state); metrics["flow_val_curve"] = hist
+
+    # closure on the test split
+    ite = np.flatnonzero(te)
+    Pn = heads["n_fit"].predict_proba(cond[ite]); nf_gen = (Pn.cumsum(1) > rng.random(len(Pn))[:, None]).argmax(1)
+    pm = np.arange(N_MAX)[None, :] < nf_gen[:, None]
+    Zg = np.concatenate([model.sample(torch.tensor(cond[ite[i:i + 8192]], device=device), torch.tensor(pm[i:i + 8192], device=device)).cpu().numpy() for i in range(0, len(ite), 8192)])
+    Xg = pt.inverse(Zg, pm); Xr = X[ite]; vr = valid[ite]
+    percol = {}
+    for j, (name, _, tf) in enumerate(FIELDS):
+        r = Xr[..., j][vr]; f = Xg[..., j][pm]; r, f = r[np.isfinite(r)], f[np.isfinite(f)]
+        if tf == "flag": percol[name] = {"mean_real": float(r.mean()), "mean_gen": float(f.mean())}
+        else:
+            from ..data.pfpset_tf import fwd
+            rr, ff = fwd(r, tf), fwd(f, tf); rr, ff = rr[np.isfinite(rr)], ff[np.isfinite(ff)]
+            percol[name] = sample_vs_real_1d(rr, ff) if len(rr) > 10 and len(ff) > 10 else {"w1": float("nan")}
+    metrics["per_field"] = percol
+    cr, cg = cohpi_counts(Xr, vr), cohpi_counts(Xg, pm)
+    two_r = (cr["n_prong"] == 2) & (cr["n_trk"] == 2) & (cr["n_proton"] == 0) & (cr["n_shower"] == 0)
+    two_g = (cg["n_prong"] == 2) & (cg["n_trk"] == 2) & (cg["n_proton"] == 0) & (cg["n_shower"] == 0)
+    metrics["cohpi_counts_test"] = {k: {"mean_real": float(cr[k].mean()), "mean_gen": float(cg[k].mean()),
+                                        "dist_real": np.bincount(np.clip(cr[k], 0, 6), minlength=7).tolist(), "dist_gen": np.bincount(np.clip(cg[k], 0, 6), minlength=7).tolist()} for k in cr}
+    metrics["cohpi_counts_test"]["two_track_rate"] = {"real": float(two_r.mean()), "gen": float(two_g.mean()), "n_test": int(len(ite))}
+    # the slice table's own counts (what the topology head produces) for comparison
+    tt = T.iloc[ite]; metrics["cohpi_counts_test"]["two_track_rate"]["slc_table"] = float(((tt.n_prong == 2) & (tt.n_trk == 2) & (tt.n_proton == 0) & (tt.n_shower == 0)).mean())
+    print("n_fit real/gen mean:", n_fit[ite].mean().round(3), nf_gen.mean().round(3), " two-track rate real/gen/slc:", round(two_r.mean(), 4), round(two_g.mean(), 4), round(metrics["cohpi_counts_test"]["two_track_rate"]["slc_table"], 4), flush=True)
+    print("W1:", {k: round(v["w1"], 3) for k, v in percol.items() if "w1" in v}, flush=True)
+    show = ["dist_to_vertex", "trackScore", "trk_len", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_kaon", "shw_energy", "shw_dEdx", "dir_z", "start_z", "pida"]
+    fig, axs = plots.plt.subplots(3, 4, figsize=(14, 9)); axs = axs.ravel()
+    for ax, name in zip(axs, show):
+        j = NAMES.index(name); tf = FIELDS[j][2]
+        from ..data.pfpset_tf import fwd
+        r, f = fwd(Xr[..., j][vr], tf), fwd(Xg[..., j][pm], tf); r, f = r[np.isfinite(r)], f[np.isfinite(f)]
+        lo, hi = np.percentile(np.concatenate([r, f]), [0.5, 99.5]); plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({name})" if tf != "lin" else name, (plots.REAL_LABEL, "set flow"))
+    plots.save(fig, out / "figures" / "m4_marginals.png")
+    fig, axs = plots.plt.subplots(1, 2, figsize=(8, 3.2))
+    plots.bar_compare(axs[0], np.bincount(n_fit[ite], minlength=N_MAX + 1), np.bincount(nf_gen, minlength=N_MAX + 1), "fitted PFPs per slice")
+    plots.bar_compare(axs[1], np.array(metrics["cohpi_counts_test"]["n_trk"]["dist_real"]), np.array(metrics["cohpi_counts_test"]["n_trk"]["dist_gen"]), "cohpi track candidates (recomputed from PFPs)")
+    plots.save(fig, out / "figures" / "m4_counts.png")
+    torch.save({"state": model.state_dict(), "dim": Zs.shape[-1], "cond_dim": cond.shape[1], "d_model": d_model, "n_layers": n_layers, "pt_loc": pt.loc, "pt_scale": pt.scale,
+                "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool,
+                "n_fit_head": heads["n_fit"].net.state_dict(), "n_empty_head": heads["n_empty"].net.state_dict()}, out / "model.pt")
+    metrics["runtime_s"] = time.time() - t0; (out / "metrics.json").write_text(json.dumps(metrics, indent=1, default=float))
+    print(f"done in {metrics['runtime_s']:.0f} s -> {out}", flush=True)
+    return metrics
