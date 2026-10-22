@@ -39,23 +39,36 @@ def in_fv_nohiyz(x, y, z):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("generated"); ap.add_argument("prod_dir"); ap.add_argument("out_dir"); ap.add_argument("--chunks", nargs="*", type=int, default=None)
+    ap.add_argument("--features", default=None, help="features.parquet of the full table, for the file-split table (default: derived from the generated index)")
+    ap.add_argument("--workers", type=int, default=1)
     a = ap.parse_args()
     os.makedirs(a.out_dir, exist_ok=True)
     G = pd.read_parquet(a.generated)
-    files = sorted(glob.glob(f"{a.prod_dir}/xsum_*_chunk*.df"), key=chunk_id)
+    files = sorted(glob.glob(f"{a.prod_dir}/xsum_*.df"), key=chunk_id)
     files = [f for f in files if a.chunks is None or chunk_id(f) in a.chunks]
     # file-level split table (same rule and seed as training)
-    allF = pd.read_parquet(glob.glob(f"{a.prod_dir}/table*/features.parquet")[-1], columns=["vtx_x"])
-    fid = allF.index.get_level_values("chunk").to_numpy() * 100000 + allF.index.get_level_values("__ntuple").to_numpy()
+    if a.features:
+        idx = pd.read_parquet(a.features, columns=[]).index
+    else:
+        idx = G.index
+    fid = idx.get_level_values("chunk").to_numpy() * 100000 + idx.get_level_values("__ntuple").to_numpy()
     sp = split_by_level(pd.MultiIndex.from_arrays([fid], names=["file"]), level="file", seed=0)
     lab = np.where(sp["train"], "train", np.where(sp["val"], "val", "test"))
-    splits = pd.DataFrame({"chunk": allF.index.get_level_values("chunk"), "__ntuple": allF.index.get_level_values("__ntuple"), "split": lab}).drop_duplicates()
+    splits = pd.DataFrame({"chunk": idx.get_level_values("chunk"), "__ntuple": idx.get_level_values("__ntuple"), "split": lab}).drop_duplicates()
     splits.to_parquet(f"{a.out_dir}/file_splits.parquet", index=False)
-    for f in files:
-        k = chunk_id(f)
-        g = G[G.index.get_level_values("chunk") == k].copy()
+    from concurrent.futures import ProcessPoolExecutor
+    with ProcessPoolExecutor(a.workers) as ex:
+        for msg in ex.map(write_one, [(f, G[G.index.get_level_values("chunk") == chunk_id(f)], a.out_dir, a.generated) for f in files]):
+            print(msg, flush=True)
+
+
+def write_one(args):
+    f, g, out_dir, generated = args
+    k = chunk_id(f)
+    if True:
+        g = g.copy()
         if g.empty:
-            print(f"chunk {k}: no generated rows, skipped"); continue
+            return f"chunk {k}: no generated rows, skipped"
         g = g.reset_index()
         g["rec.slc..index"] = g.groupby(["__ntuple", "entry"]).cumcount()
         g["tmatch_idx"] = g["rec.mc.nu..index"].astype(np.int32)
@@ -67,16 +80,23 @@ def main():
         g["pass_cohpi"] = g.pass_cohpi & g.pass_fv_cosmic; g["in_sr"] = g.in_sr & g.pass_fv_cosmic
         g["surrogate_topology_class"] = g["topology_class"]
         slc = g.set_index(["__ntuple", "entry", "rec.slc..index"])[[c for c in SLC_ORDER if c in g.columns] + ["surrogate_topology_class"]].sort_index()
-        out = f"{a.out_dir}/xsum_surrogate_chunk{k}.df"
-        with pd.HDFStore(out, mode="w") as st:
-            for t in ("mcnu", "mcprim", "hdr", "histpotdf", "histgenevtdf", "pot"):
-                df = read_table(f, t)
+        out = f"{out_dir}/xsum_surrogate_{k}.df"
+        if os.path.exists(out):
+            return f"chunk {k}: exists"
+        tmp = out + ".tmp"
+        with pd.HDFStore(tmp, mode="w") as st:
+            for t in ("mcnu", "mcprim", "mcdaught", "pfp", "hdr", "histpotdf", "histgenevtdf", "pot"):
+                try:
+                    df = read_table(f, t)
+                except Exception:
+                    continue
                 if len(df): df = df.droplevel("chunk")
                 st.put(f"{t}_0", df, format="fixed")
             st.put("slc_0", slc, format="fixed")
             st.put("split", pd.DataFrame({"n_split": [1]}), format="fixed")
-            st.put("provenance", pd.DataFrame({"generated_from": [os.path.basename(a.generated)], "production_chunk": [os.path.basename(f)]}), format="fixed")
-        print(f"chunk {k}: {len(slc)} surrogated slices -> {out}")
+            st.put("provenance", pd.DataFrame({"generated_from": [os.path.basename(generated)], "production_chunk": [os.path.basename(f)]}), format="fixed")
+        os.replace(tmp, out)
+        return f"chunk {k}: {len(slc)} surrogated slices -> {out}"
 
 
 if __name__ == "__main__":
