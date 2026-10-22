@@ -102,7 +102,7 @@ Tier 1: the slice block (Table~\ref{tab:m2cols} lists the columns). Tier 2 (M4):
 
 Gradient-boosted classifiers for the discrete targets and mixture density networks (MDN, eight diagonal
 Gaussians, against a single Gaussian) for continuous responses, on the \nFeat{} features. Results on the
-test files of the five scratch chunks (\mOneDir).
+test files of the official sample (\mOneDir); the scratch-sample results are in the git history of this note.
 
 \paragraph{Slice efficiency.} \fracMatched\% of all true neutrinos (dirt and out-of-volume included) have a
 truth-matched slice. Log loss \matchedLL{} against a marginal \matchedLLm, AUC \matchedAUC. The calibration
@@ -158,13 +158,15 @@ width 1024) over the standardised continuous block, masked per event to the grou
 (sim2reco \texttt{dim\_mask}). Positive quantities enter as logarithms, direction cosines and the opening
 angle through $\operatorname{artanh}$ (and direction vectors are renormalised), standardisation is robust
 (median, MAD). Inverse transforms produce a dataframe with the production column names. Trained on
-\mTwoMatched{} matched slices (all six chunks of the scratch production) for \mTwoEpochs{} epochs (23\,min on one RTX~3090,
-peak 12\,GB of host memory).
+\mTwoMatched{} matched slices of the official sample for \mTwoEpochs{} epochs (54\,min on one RTX~3090). Host
+memory is kept near 10\,GB by splitting the table once on disk into a matched-only table and a 4\,M-row
+subsample for the cardinality head, training the presence heads on 2\,M-row subsamples and building the topology
+one-hot per batch on the GPU.
 
 Earlier versions and what they taught: v1 (unbounded cosines, counts as dequantised flow dimensions) closed
 the cohpi cut flow only to 45\% in the signal region; v2 (bounded cosines, point-mass heads) to 74\%, losing
-most at the exact-count stage; v3 (topology head) closes every stage within statistics
-(Table~\ref{tab:m2cut}).
+most at the exact-count stage; v3 (topology head) closes every stage within statistics on the scratch sample and to better than 10\% at every
+stage on the official sample (Table~\ref{tab:m2cut}).
 
 \begin{table}[h]\centering\input{m2_presence.tex}\caption{Group presence and containment heads, test files.}\label{tab:m2pres}\end{table}
 
@@ -173,8 +175,8 @@ most at the exact-count stage; v3 (topology head) closes every stage within stat
 Table~\ref{tab:m2cut} recomputes the cohpi cut flow on the generated and the real test slices, for all slices
 and for true signal; this is the kind of comparison the analysers will make on the full surrogated sample.
 
-\IfFileExists{figures/m2_scratch1633_v3_6ch/m2_marginals.png}{%
-\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_scratch1633_v3_6ch/m2_marginals.png}
+\IfFileExists{figures/m2_official_v3/m2_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m2_official_v3/m2_marginals.png}
 \caption{Marginals of generated (flow) against \real{} slice variables, test files.}\label{fig:m2marg}\end{figure}}{(M2 figure not yet available)}
 
 \begin{table}[h]\centering\input{m2_cutflow.tex}\caption{cohpi cut flow recomputed on real and generated test slices.}\label{tab:m2cut}\end{table}
