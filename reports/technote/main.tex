@@ -73,6 +73,13 @@ links and truth match), \texttt{hdr} and POT tables. Two productions:
       375-file pilot (21.5\,s per file single-threaded, 4,500 CPU-hours in total).
 \end{itemize}
 
+\paragraph{A defect of the official production and its repair.} The module version used on the grid counted
+showers among all PFPs of a slice instead of those within 50\,cm of the vertex, so the two-track topology never
+fired and the slice two-track block and the selection flags are empty in the archive. All of them are functions
+of the PFP table, so they were rebuilt offline exactly as cafpyana computes them (\texttt{xsum.prep.repair}) and
+stored as sidecar \texttt{slc} files; the training tables and the surrogated dataset use the repaired tables. The
+module is fixed for future productions.
+
 \paragraph{Truth--reco link.} A slice points to its truth-matched neutrino through \texttt{tmatch\_idx}; a PFP
 points to the true particle it was matched to and, through \texttt{interaction\_id}, to its neutrino. A
 neutrino can have zero, one or several matched slices; the table keeps the slice with the highest match
@@ -192,7 +199,7 @@ so the full official sample takes a quarter of an hour), with the slice-multipli
 \real{} (216 against 220 in the signal region).
 \FloatBarrier
 
-\section{First surrogated dataset for the analysers}
+\section{Surrogated datasets for the analysers}
 \label{sec:dataset}
 
 \texttt{scripts/write\_surrogate\_df.py} turns the generated slices into files in the production format, so
@@ -212,6 +219,16 @@ production (the training sample itself; comparisons with the real chain must use
 \item content: 3,241,308 generated slices (13\,min of generation), of which 5,252 pass the full cohpi selection and
       2,759 are in the signal region; no \texttt{pfp} table yet (M4), no cosmic-only slices (to be taken from the MC).
 \end{itemize}
+
+The second dataset, \texttt{surrogate\_official\_v3} (2026-10-22), applies the official-sample model of
+Sec.~\ref{sec:m2} to all 17,861,754 neutrinos of the official production: 5.9\,M generated slices in 27\,min,
+6,302 of which pass the full cohpi selection against 6,095 in the real chain (2,988 in the signal region). It is
+written as 2,000 files \texttt{xsum\_surrogate\_N.df} (75\,GB) in
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_v3/}, one per grid job of the archive
+\texttt{prod\_v10\_14\_02\_03\_official/}, with \texttt{mcnu, mcprim, mcdaught, pfp, hdr} and the POT tables
+copied from the production and \texttt{slc\_0} generated (same conventions as above); \texttt{file\_splits.parquet}
+marks the 74,533 test files. Note that the real \texttt{slc} tables of that archive must be read from the repaired
+sidecars \texttt{prod\_v10\_14\_02\_03\_official\_slcfix/} (Sec.~\ref{sec:data}).
 
 \section{Outlook}
 \label{sec:outlook}
