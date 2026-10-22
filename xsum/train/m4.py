@@ -26,9 +26,15 @@ from .m2 import SPEC, TOPO_COLS, BlockTransform, MLPClassifier, Topology, mask_f
 N_EMPTY_MAX = 3
 
 
-def load_sets(pfpsets_dir):
-    parts = [np.load(f) for f in sorted(glob.glob(f"{pfpsets_dir}/group_*.npz"))]
-    return {k: np.concatenate([p[k] for p in parts]) for k in ("key", "X", "n_fit", "n_empty", "truth_pdg")}
+def load_sets(pfpsets_dir, max_slices=None, seed=0):
+    """Concatenate the group files; with max_slices, keep a random fraction of every group (memory: the subsample only)."""
+    files = sorted(glob.glob(f"{pfpsets_dir}/group_*.npz")); rng = np.random.default_rng(seed)
+    tot = sum(len(np.load(f)["n_fit"]) for f in files); frac = 1.0 if not max_slices or tot <= max_slices else max_slices / tot
+    parts = []
+    for f in files:
+        d = np.load(f); n = len(d["n_fit"]); keep = np.sort(rng.choice(n, int(round(frac * n)), replace=False)) if frac < 1 else np.arange(n)
+        parts.append({k: d[k][keep] for k in ("key", "X", "n_fit", "n_empty", "truth_pdg")})
+    return {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
 
 
 def cohpi_counts(X, valid):
@@ -42,7 +48,7 @@ def cohpi_counts(X, valid):
 
 def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_slices=3_000_000, d_model=192, n_layers=4, bs=1024, lr=5e-4):
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True); t0 = time.time()
-    S = load_sets(pfpsets_dir)
+    S = load_sets(pfpsets_dir, max_slices, seed)
     T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=[c for c, _, _ in SPEC] + TOPO_COLS)
     F = pd.read_parquet(f"{table_dir}/features.parquet")
     # align sets with the table rows by neutrino key
