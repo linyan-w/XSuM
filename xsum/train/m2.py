@@ -200,24 +200,27 @@ class MLPClassifier:
         return np.concatenate(out)
 
 
-def train_flow(Ztr, Mtr, Ctr, Zva, Mva, Cva, epochs, device, hidden=512, n_layers=5, bs=4096, lr=1e-3, seed=0):
+def train_flow(Ztr, Mtr, Ctr, ktr, Zva, Mva, Cva, kva, n_classes, epochs, device, hidden=512, n_layers=5, bs=4096, lr=1e-3, seed=0):
+    """Conditioning = standardised features + one-hot topology class, assembled per batch on the GPU."""
     torch.manual_seed(seed)
-    model = FlowMatcher(Ztr.shape[1], Ctr.shape[1], hidden, n_layers).to(device)
+    model = FlowMatcher(Ztr.shape[1], Ctr.shape[1] + n_classes, hidden, n_layers).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, epochs)
     t = lambda a: torch.tensor(a, device=device)
-    Zt, Mt, Ct, Zv, Mv, Cv = t(Ztr), t(Mtr), t(Ctr), t(Zva), t(Mva), t(Cva)
+    Zt, Mt, Ct, kt = t(Ztr), t(Mtr), t(Ctr), torch.tensor(ktr, dtype=torch.long, device=device)
+    Zv, Mv, Cv, kv = t(Zva), t(Mva), t(Cva), torch.tensor(kva, dtype=torch.long, device=device)
+    cond = lambda C, k: torch.cat([C, torch.nn.functional.one_hot(k, n_classes).to(C.dtype)], -1)
     best, best_state, hist = np.inf, None, []
     for ep in range(epochs):
         model.train(); perm = torch.randperm(len(Zt), device=device); tl = 0.0; nb = 0
         for i in range(0, len(Zt), bs):
             idx = perm[i:i + bs]
-            loss = model.loss(Zt[idx], Ct[idx], Mt[idx]).mean()
+            loss = model.loss(Zt[idx], cond(Ct[idx], kt[idx]), Mt[idx]).mean()
             opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step()
             tl += loss.item(); nb += 1
         sched.step(); model.eval()
         with torch.no_grad():
-            vl = float(np.mean([model.loss(Zv[i:i + 65536], Cv[i:i + 65536], Mv[i:i + 65536]).mean().item() for i in range(0, len(Zv), 65536)]))
+            vl = float(np.mean([model.loss(Zv[i:i + 65536], cond(Cv[i:i + 65536], kv[i:i + 65536]), Mv[i:i + 65536]).mean().item() for i in range(0, len(Zv), 65536)]))
         hist.append({"epoch": ep, "train": tl / max(nb, 1), "val": vl})
         print(f"epoch {ep:3d} train {tl / max(nb, 1):.4f} val {vl:.4f}", flush=True)
         if vl < best:
@@ -286,36 +289,36 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
                            "logloss_marginal": float(-np.log(np.clip(np.bincount(ktrue[tr & matched], minlength=topo.other + 1)[ktrue[te & matched]] / (tr & matched).sum(), 1e-9, None)).mean()),
                            "accuracy": float((Pt.argmax(1) == ktrue[te & matched]).mean())}
     print("topology:", {k: round(v, 4) for k, v in metrics["topology"].items()}, flush=True)
-    Hk = topo.onehot(ktrue)                      # real topology one-hot (training / teacher forcing)
-    XH = np.concatenate([X, Hk], 1)              # GBDT heads see features + topology
+    def xh(mask, cap=2_000_000):
+        """features + topology one-hot for the rows of `mask` (subsampled to `cap` rows): built on demand, never for all rows."""
+        rows = np.flatnonzero(mask)
+        if len(rows) > cap: rows = np.sort(np.random.default_rng(seed).choice(rows, cap, replace=False))
+        return np.concatenate([X[rows], topo.onehot(ktrue[rows])], 1), rows
     bt = BlockTransform(); P = presence(T, bt)
     pres_metrics = {}
+    def fit_head(name, y, m):
+        Xa, ra = xh(tr & m); heads[name] = gbdt(Xa, y[ra], seed, max_iter=300); del Xa
+        Xb, rb = xh(te & m, cap=10**9); pres_metrics[name] = binary_metrics(y[rb], heads[name].predict_proba(Xb)[:, 1]); del Xb
     for g in GROUPS:
-        y = P[g].astype(int); m = matched
-        heads[g] = gbdt(XH[tr & m], y[tr & m], seed, max_iter=300)
-        pres_metrics[g] = binary_metrics(y[te & m], heads[g].predict_proba(XH[te & m])[:, 1])
+        fit_head(g, P[g].astype(int), matched)
     for fl in FLAGS:
-        y = np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int); m = matched & P["two"]
-        heads[fl] = gbdt(XH[tr & m], y[tr & m], seed, max_iter=300)
-        pres_metrics[fl] = binary_metrics(y[te & m], heads[fl].predict_proba(XH[te & m])[:, 1])
+        fit_head(fl, np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int), matched & P["two"])
     for c, (test, _) in SPIKES.items():
         v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
-        m = matched & ok & (P["two"] if c == "opening_angle" else True)
-        heads["spike_" + c] = gbdt(XH[tr & m], y[tr & m], seed, max_iter=300)
-        pres_metrics["spike_" + c] = binary_metrics(y[te & m], heads["spike_" + c].predict_proba(XH[te & m])[:, 1])
+        fit_head("spike_" + c, y, matched & ok & (P["two"] if c == "opening_angle" else True))
     metrics["presence"] = pres_metrics
     print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
 
     # ---- flow over the standardised block ----------------------------------------------------------------------
-    Y = bt.matrix(T); bt.fit(Y[tr & matched])
-    Z, Mfin = bt.standardise(Y)
+    Y = bt.matrix(T).astype(np.float32); bt.fit(Y[tr & matched])
+    Z, Mfin = bt.standardise(Y); del Y
     Mg = mask_from_presence(P, bt) * Mfin          # groups absent or values non-finite are masked
     Sreal = {}
     for c, (test, _) in SPIKES.items():
         j = bt.cols.index(c); v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v)
         Mg[Sreal[c], j] = 0.0                      # point masses are not modelled by the flow
-    CH = np.concatenate([C, Hk], 1)
-    model, hist = train_flow(Z[tr & matched], Mg[tr & matched], CH[tr & matched], Z[va & matched], Mg[va & matched], CH[va & matched], epochs, device, hidden, n_layers, seed=seed)
+    model, hist = train_flow(Z[tr & matched], Mg[tr & matched], C[tr & matched], ktrue[tr & matched], Z[va & matched], Mg[va & matched], C[va & matched], ktrue[va & matched],
+                             topo.other + 1, epochs, device, hidden, n_layers, seed=seed)
     metrics["flow_val_curve"] = hist
 
     # ---- closure on the test split: real vs generated slice blocks ---------------------------------------------
@@ -371,7 +374,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
     plots.save(fig, out / "figures" / "m2_marginals.png")
     gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
-    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": CH.shape[1], "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
+    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + topo.other + 1, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": SPEC}, out / "model.pt")
     import pickle
     topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1], "n_classes": topo.other + 1}, out / "topology_head.pt")
