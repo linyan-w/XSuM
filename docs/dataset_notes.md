@@ -156,8 +156,14 @@ and `slc_0` replaced by the generated slices (index `(__ntuple, entry, rec.slc..
 generating neutrino, `tmatch_eff` / `tmatch_purity` NaN, `is_fv` from the generated vertex, selection flags
 recomputed, `surrogate_topology_class` added), plus `file_splits.parquet` (train / val / test per input file,
 same rule and seed as training). Comparisons with the real chain should use the test files only.
-First dataset: `surrogate_v3_6ch` (M2 v3 trained on all six scratch chunks, applied to the same 9.8 M
-neutrinos), in `/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_v3_6ch/` once written. No `pfp` table yet.
+Datasets on `/pnfs/sbnd/persistent/users/lwan/dataframe/`:
+- `surrogate_v3_6ch/`: M2 v3 trained on the six scratch chunks, applied to the same 9.8 M neutrinos (6 files, 11 GB).
+- `surrogate_official_v3/`: M2 v3 trained on the official sample (5.74 M matched slices), applied to all
+  17,861,754 official neutrinos: 5,9 M generated slices (6,302 pass the full cohpi selection against 6,095 in
+  the real chain, 2,988 in the signal region), written as 2,000 `xsum_surrogate_N.df` files next to the archive
+  `prod_v10_14_02_03_official/`, with `mcnu, mcprim, mcdaught, pfp, hdr, ...` copied and `slc_0` generated.
+  The real `slc` tables of that archive need the repaired sidecars (`prod_v10_14_02_03_official_slcfix/`).
+No generated `pfp` table yet (M4).
 
 # The official production (`prod_v10_14_02_03_official`)
 
