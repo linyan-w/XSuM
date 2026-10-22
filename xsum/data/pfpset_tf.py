@@ -50,9 +50,12 @@ class PfpTransform:
             U[..., j] = _dequant(np.nan_to_num(X[..., j], nan=0.0), rng) if tf == "flag" else fwd(X[..., j], tf)
         return U
 
-    def fit(self, X, seed=0):
+    def fit(self, X, seed=0, max_rows=500_000):
+        """Robust location/scale per field from (a subsample of) the valid tokens."""
+        rng = np.random.default_rng(seed)
+        if len(X) > max_rows: X = X[np.sort(rng.choice(len(X), max_rows, replace=False))]
         valid = ~np.isnan(X[..., 0])
-        U = self._unscaled(X, np.random.default_rng(seed))
+        U = self._unscaled(X, rng)
         for j, (name, _, tf) in enumerate(FIELDS):
             if tf == "flag": continue
             v = U[..., j][valid]; v = v[np.isfinite(v)]
@@ -60,13 +63,16 @@ class PfpTransform:
             self.loc[j] = np.median(v); self.scale[j] = 1.4826 * np.median(np.abs(v - self.loc[j])) + 1e-6
         return self
 
-    def forward(self, X, rng):
-        """-> Z [n, N, D] float32 (noise where absent or padded), valid [n, N] bool."""
-        valid = ~np.isnan(X[..., 0])
-        U = (self._unscaled(X, rng) - self.loc) / self.scale
-        Z = np.where(np.isfinite(U), U, rng.standard_normal(U.shape))
-        Z[~valid] = rng.standard_normal((int((~valid).sum()), Z.shape[-1]))
-        return np.clip(Z, -8, 8).astype(np.float32), valid
+    def forward(self, X, rng, chunk=200_000):
+        """-> Z [n, N, D] float32 (noise where absent or padded), valid [n, N] bool. Chunked: float64 temporaries
+        exist only for `chunk` slices at a time."""
+        Z = np.empty(X.shape, dtype=np.float32); valid = ~np.isnan(X[..., 0])
+        for i in range(0, len(X), chunk):
+            U = (self._unscaled(X[i:i + chunk], rng) - self.loc) / self.scale
+            z = np.where(np.isfinite(U), U, rng.standard_normal(U.shape)); del U
+            v = valid[i:i + chunk]; z[~v] = rng.standard_normal((int((~v).sum()), z.shape[-1]))
+            Z[i:i + chunk] = np.clip(z, -8, 8); del z
+        return Z, valid
 
     def inverse(self, Z, valid):
         """Model space -> raw record [n, N, D] with NaN where the governing flag is off or the token is padding."""
