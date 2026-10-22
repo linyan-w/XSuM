@@ -41,6 +41,7 @@ def main():
     ap.add_argument("generated"); ap.add_argument("prod_dir"); ap.add_argument("out_dir"); ap.add_argument("--chunks", nargs="*", type=int, default=None)
     ap.add_argument("--features", default=None, help="features.parquet of the full table, for the file-split table (default: derived from the generated index)")
     ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--pfp", default=None, help="generated pfp parquet (generate_pfp.py); replaces the copied pfp table")
     a = ap.parse_args()
     os.makedirs(a.out_dir, exist_ok=True)
     G = pd.read_parquet(a.generated)
@@ -56,14 +57,16 @@ def main():
     lab = np.where(sp["train"], "train", np.where(sp["val"], "val", "test"))
     splits = pd.DataFrame({"chunk": idx.get_level_values("chunk"), "__ntuple": idx.get_level_values("__ntuple"), "split": lab}).drop_duplicates()
     splits.to_parquet(f"{a.out_dir}/file_splits.parquet", index=False)
+    PF = pd.read_parquet(a.pfp) if a.pfp else None
     from concurrent.futures import ProcessPoolExecutor
     with ProcessPoolExecutor(a.workers) as ex:
-        for msg in ex.map(write_one, [(f, G[G.index.get_level_values("chunk") == chunk_id(f)], a.out_dir, a.generated) for f in files]):
+        for msg in ex.map(write_one, [(f, G[G.index.get_level_values("chunk") == chunk_id(f)], a.out_dir, a.generated,
+                                       None if PF is None else PF[PF.index.get_level_values("chunk") == chunk_id(f)]) for f in files]):
             print(msg, flush=True)
 
 
 def write_one(args):
-    f, g, out_dir, generated = args
+    f, g, out_dir, generated, pf = args
     k = chunk_id(f)
     if True:
         g = g.copy()
@@ -80,12 +83,21 @@ def write_one(args):
         g["pass_cohpi"] = g.pass_cohpi & g.pass_fv_cosmic; g["in_sr"] = g.in_sr & g.pass_fv_cosmic
         g["surrogate_topology_class"] = g["topology_class"]
         slc = g.set_index(["__ntuple", "entry", "rec.slc..index"])[[c for c in SLC_ORDER if c in g.columns] + ["surrogate_topology_class"]].sort_index()
+        pfp_gen = None
+        if pf is not None and len(pf):
+            # generated PFPs carry (chunk, __ntuple, entry, nu, draw, pfp index); map (…, nu, draw) -> the slice index assigned above
+            m = g[["__ntuple", "entry", "rec.mc.nu..index", "draw", "rec.slc..index"]]
+            q = pf.reset_index().merge(m, on=["__ntuple", "entry", "rec.mc.nu..index", "draw"], how="inner")
+            q["slc_tmatch_idx"] = q["rec.mc.nu..index"].astype(np.int32); q["pfp_id"] = q["rec.slc.reco.pfp..index"].astype(np.int32)
+            pfp_gen = q.set_index(["__ntuple", "entry", "rec.slc..index", "rec.slc.reco.pfp..index"]).drop(columns=["chunk", "rec.mc.nu..index", "draw"]).sort_index()
         out = f"{out_dir}/xsum_surrogate_{k}.df"
         if os.path.exists(out):
             return f"chunk {k}: exists"
         tmp = out + ".tmp"
         with pd.HDFStore(tmp, mode="w") as st:
             for t in ("mcnu", "mcprim", "mcdaught", "pfp", "hdr", "histpotdf", "histgenevtdf", "pot"):
+                if t == "pfp" and pfp_gen is not None:
+                    st.put("pfp_0", pfp_gen, format="fixed"); continue
                 try:
                     df = read_table(f, t)
                 except Exception:
@@ -96,7 +108,7 @@ def write_one(args):
             st.put("split", pd.DataFrame({"n_split": [1]}), format="fixed")
             st.put("provenance", pd.DataFrame({"generated_from": [os.path.basename(generated)], "production_chunk": [os.path.basename(f)]}), format="fixed")
         os.replace(tmp, out)
-        return f"chunk {k}: {len(slc)} surrogated slices -> {out}"
+        return f"chunk {k}: {len(slc)} surrogated slices" + (f", {len(pfp_gen)} generated PFPs" if pfp_gen is not None else "") + f" -> {out}"
 
 
 if __name__ == "__main__":
