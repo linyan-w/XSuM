@@ -237,11 +237,26 @@ def sample_flow(model, C, M, device, n_steps=64, bs=65536):
     return np.concatenate(out)
 
 
-def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5):
+def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None):
+    """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
+    then table_dir is expected to hold matched slices only (see scripts/split_official_table.py)."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
     # memory-aware loading: the cardinality head sees all neutrinos (on a subsample), everything else only matched slices
+    if card_table:                                    # cardinality head from its own (subsampled) table
+        cF = pd.read_parquet(f"{card_table}/features.parquet"); cT = pd.read_parquet(f"{card_table}/targets.parquet", columns=["matched", "n_matched_slices"])
+        cfid = cF.index.get_level_values("chunk").to_numpy() * 100000 + cF.index.get_level_values("__ntuple").to_numpy()
+        csp = split_by_level(pd.MultiIndex.from_arrays([cfid], names=["file"]), level="file", seed=seed)
+        cX = np.ascontiguousarray(cF.to_numpy(np.float32)); del cF
+        ncl = np.clip(cT.n_matched_slices.to_numpy(), 0, 2).astype(int); del cT
+        itr = np.flatnonzero(csp["train"]); itr = np.sort(np.random.default_rng(seed).choice(itr, min(len(itr), 2_000_000), replace=False))
+        heads = {"n_matched_slices": gbdt(cX[itr], ncl[itr], seed)}
+        cte = csp["test"]; Pn = np.zeros((int(cte.sum()), 3)); Pn[:, heads["n_matched_slices"].classes_] = heads["n_matched_slices"].predict_proba(cX[cte])
+        card_metrics = {"marginal_true": np.bincount(ncl[cte], minlength=3).tolist(), "mean_prob": Pn.mean(0).tolist(),
+                        "logloss": float(-np.log(np.clip(Pn[np.arange(len(Pn)), ncl[cte]], 1e-9, None)).mean()), "n_card_rows": int(len(cX))}
+        del cX, ncl, Pn, itr, csp
+        print("cardinality head trained on the card table", flush=True)
     card = pd.read_parquet(f"{table_dir}/targets.parquet", columns=["matched", "n_matched_slices"])
     F = pd.read_parquet(f"{table_dir}/features.parquet")
     if max_rows and len(F) > max_rows:
@@ -256,14 +271,17 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     print(f"table {len(F)} neutrinos, matched {matched.sum()}  ({time.time()-t0:.0f} s)", flush=True)
 
     # ---- slice cardinality (GBDT on at most 2M training neutrinos) --------------------------------------------
-    heads = {}
-    ncl = np.clip(card.n_matched_slices.to_numpy(), 0, 2).astype(int)
-    itr = np.flatnonzero(tr); itr = np.sort(np.random.default_rng(seed).choice(itr, min(len(itr), 2_000_000), replace=False))
-    heads["n_matched_slices"] = gbdt(X[itr], ncl[itr], seed)
-    Pn = np.zeros((int(te.sum()), 3)); Pn[:, heads["n_matched_slices"].classes_] = heads["n_matched_slices"].predict_proba(X[te])
-    metrics["n_matched_slices"] = {"marginal_true": np.bincount(ncl[te], minlength=3).tolist(), "mean_prob": Pn.mean(0).tolist(),
-                                   "logloss": float(-np.log(np.clip(Pn[np.arange(len(Pn)), ncl[te]], 1e-9, None)).mean())}
-    del card, Pn, itr
+    if card_table:
+        metrics["n_matched_slices"] = card_metrics; del card
+    else:
+        heads = {}
+        ncl = np.clip(card.n_matched_slices.to_numpy(), 0, 2).astype(int)
+        itr = np.flatnonzero(tr); itr = np.sort(np.random.default_rng(seed).choice(itr, min(len(itr), 2_000_000), replace=False))
+        heads["n_matched_slices"] = gbdt(X[itr], ncl[itr], seed)
+        Pn = np.zeros((int(te.sum()), 3)); Pn[:, heads["n_matched_slices"].classes_] = heads["n_matched_slices"].predict_proba(X[te])
+        metrics["n_matched_slices"] = {"marginal_true": np.bincount(ncl[te], minlength=3).tolist(), "mean_prob": Pn.mean(0).tolist(),
+                                       "logloss": float(-np.log(np.clip(Pn[np.arange(len(Pn)), ncl[te]], 1e-9, None)).mean())}
+        del card, Pn, itr
     # everything below concerns matched slices only
     keep = matched
     F, X = F[keep], X[keep]
