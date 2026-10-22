@@ -71,7 +71,7 @@ class PfpTransform:
             U = (self._unscaled(X[i:i + chunk], rng) - self.loc) / self.scale
             z = np.where(np.isfinite(U), U, rng.standard_normal(U.shape)); del U
             v = valid[i:i + chunk]; z[~v] = rng.standard_normal((int((~v).sum()), z.shape[-1]))
-            Z[i:i + chunk] = np.clip(z, -8, 8); del z
+            Z[i:i + chunk] = np.clip(z, -15, 15); del z   # wide enough for the vertex-distance tail (robust MAD is tiny)
         return Z, valid
 
     def inverse(self, Z, valid):

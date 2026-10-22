@@ -23,7 +23,7 @@ def fmt(x, nd=3):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("out"); ap.add_argument("--m1", default=None); ap.add_argument("--m2", default=None)
+    ap.add_argument("out"); ap.add_argument("--m1", default=None); ap.add_argument("--m2", default=None); ap.add_argument("--m4", default=None)
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     mac = ""
@@ -79,6 +79,23 @@ def main():
         for k in ("mTwoMatched", "mTwoEpochs", "mTwoWmax", "mTwoWmed"):
             mac += macro(k, "--")
         for f in ("m2_columns.tex", "m2_cutflow.tex", "m2_presence.tex"):
+            open(f"{a.out}/{f}", "w").write("(not yet available)\n")
+    m4 = json.load(open(f"{a.m4}/metrics.json")) if a.m4 and os.path.exists(f"{a.m4}/metrics.json") else None
+    if m4:
+        mac += macro("mFourN", fmt(m4["n"])) + macro("mFourEpochs", fmt(m4["epochs"])) + macro("mFourCond", fmt(m4["cond_dim"]))
+        mac += macro("mFourNfitAcc", fmt(100 * m4["n_fit"]["accuracy"], 1)) + macro("mFourNfitLL", fmt(m4["n_fit"]["logloss"], 3)) + macro("mFourNfitLLm", fmt(m4["n_fit"]["logloss_marginal"], 3))
+        cc = m4["cohpi_counts_test"]; tw = cc["two_track_rate"]
+        mac += macro("mFourTwoReal", fmt(100 * tw["real"], 2)) + macro("mFourTwoGen", fmt(100 * tw["gen"], 2)) + macro("mFourTwoSlc", fmt(100 * tw["slc_table"], 2)) + macro("mFourNtest", fmt(tw["n_test"]))
+        pf = m4["per_field"]; w1 = sorted(v["w1"] for v in pf.values() if "w1" in v and v["w1"] == v["w1"])
+        mac += macro("mFourWmed", fmt(w1[len(w1) // 2], 3)) + macro("mFourWmax", fmt(w1[-1], 3))
+        rows = [f"{tex(k)} & {v['mean_real']:.3f} & {v['mean_gen']:.3f} & -- \\\\" if "mean_real" in v else f"{tex(k)} & {v['real_q16_50_84'][1]:.3f} & {v['fake_q16_50_84'][1]:.3f} & {v['w1']:.4f} \\\\" for k, v in pf.items()]
+        open(f"{a.out}/m4_fields.tex", "w").write("\\begin{longtable}{lccc}\n\\toprule\nField & Pandora median (flags: mean) & generated & $W_1$ (transformed units) \\\\\n\\midrule\n\\endhead\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{longtable}\n")
+        rows = [f"{tex(k)} & {cc[k]['mean_real']:.3f} & {cc[k]['mean_gen']:.3f} & " + " / ".join(str(x) for x in cc[k]["dist_real"][:5]) + " & " + " / ".join(str(x) for x in cc[k]["dist_gen"][:5]) + " \\\\" for k in ("n_prong", "n_trk", "n_proton", "n_shower")]
+        open(f"{a.out}/m4_counts.tex", "w").write("\\begin{tabular}{lcccc}\n\\toprule\nCount & mean, Pandora & mean, generated & 0/1/2/3/4, Pandora & 0/1/2/3/4, generated \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
+    else:
+        for k in ("mFourN", "mFourEpochs", "mFourCond", "mFourNfitAcc", "mFourNfitLL", "mFourNfitLLm", "mFourTwoReal", "mFourTwoGen", "mFourTwoSlc", "mFourNtest", "mFourWmed", "mFourWmax"):
+            mac += macro(k, "--")
+        for f in ("m4_fields.tex", "m4_counts.tex"):
             open(f"{a.out}/{f}", "w").write("(not yet available)\n")
     open(f"{a.out}/numbers.tex", "w").write(mac)
     print("wrote", a.out)

@@ -199,6 +199,39 @@ so the full official sample takes a quarter of an hour), with the slice-multipli
 \real{} (216 against 220 in the signal region).
 \FloatBarrier
 
+\section{M4: the PFP set of a slice}
+\label{sec:m4}
+
+The particle-flow objects of a slice are generated as a set. Per matched slice the fitted PFPs (those with a track or
+shower fit; the few without either are counted separately) are sorted by distance to the vertex and padded to 12
+(99.99\% of slices have at most 12). Each PFP carries 29 fields: presence flags (track fit, shower fit, MCS fit,
+primary), distance to the vertex, track score, start point, direction, track length, range and MCS muon
+momenta, chi2 for muon, proton (both calibrations), kaon and pion on the collection plane, PIDA and the chi2
+degrees of freedom, and the shower energy, length, opening angle, density, conversion gap and dE/dx. Flags are
+dequantised, fields that do not exist for a PFP are filled with noise and restored from the flags after
+generation (sim2reco's prong convention). The conditioning vector (\mFourCond{} numbers) is the truth features,
+the topology one-hot and the generated slice block, so the PFP set is consistent with the slice record.
+Two softmax heads give the number of fitted and of empty PFPs; a masked set flow (transformer velocity net over
+the PFP tokens, flow matching) generates the records. Trained on \mFourN{} slices for \mFourEpochs{} epochs.
+
+The number of fitted PFPs is predicted with \mFourNfitAcc\% accuracy (log loss \mFourNfitLL{} against
+\mFourNfitLLm{} marginal): the slice block already carries the multiplicities. Table~\ref{tab:m4fields}
+compares every generated field with \real{} on the test slices (median $W_1$ \mFourWmed, maximum \mFourWmax, in
+transformed units), Fig.~\ref{fig:m4marg} shows marginals. The physics closure is Table~\ref{tab:m4counts}:
+the cohpi multiplicities (prongs, track candidates, proton candidates, showers) recomputed from the generated
+PFPs against the same recomputation on the real PFPs; the exactly-two-tracks topology rate is
+\mFourTwoGen\% generated against \mFourTwoReal\% real (\mFourTwoSlc\% from the slice table itself).
+
+\begin{table}[h]\centering\small\input{m4_counts.tex}\caption{cohpi multiplicities recomputed from PFP sets, test slices.}\label{tab:m4counts}\end{table}
+\IfFileExists{figures/m4_official_v2/m4_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m4_official_v2/m4_marginals.png}
+\caption{PFP fields, generated set against \real{}, test slices (valid tokens).}\label{fig:m4marg}\end{figure}}{%
+\IfFileExists{figures/m4_official/m4_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m4_official/m4_marginals.png}
+\caption{PFP fields, generated set against \real{}, test slices (valid tokens).}\label{fig:m4marg}\end{figure}}{}}
+\small\input{m4_fields.tex}\normalsize
+\FloatBarrier
+
 \section{Surrogated datasets for the analysers}
 \label{sec:dataset}
 
@@ -236,7 +269,8 @@ sidecars \texttt{prod\_v10\_14\_02\_03\_official\_slcfix/} (Sec.~\ref{sec:data})
 \begin{enumerate}
 \item Official sample (9.94\,M triggers): retrain M1/M2, add the \texttt{mcdaught} and full-PFP tables.
 \item M3: particle-set encoder (transformer over primaries + vertex token) replacing the fixed features.
-\item M4: PFP set generation (cardinality + equivariant set flow), Bayesian last layers for an epistemic flag.
+\item M4 (first version in Sec.~\ref{sec:m4}): generated \texttt{pfp} tables in the surrogated datasets, chi2 on the
+      induction planes and track end points, cross-attention to particle tokens (M3), Bayesian last layers.
 \item Holdouts: train on $|t|<0.1$, test the tail; low versus high $E_\nu$; forward versus wide-angle muons;
       $\le 2$ versus $\ge 3$ charged primaries; one TPC versus the other.
 \item Surrogated dataframes written in the production format for the cohpi and kaon analysers.
