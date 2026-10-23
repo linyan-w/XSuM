@@ -188,6 +188,26 @@ and for true signal; this is the kind of comparison the analysers will make on t
 
 \begin{table}[h]\centering\input{m2_cutflow.tex}\caption{cohpi cut flow recomputed on real and generated test slices.}\label{tab:m2cut}\end{table}
 
+\paragraph{Correlations.} A surrogate that matched every marginal but sampled the variables independently would
+fail any analysis that cuts on several of them. Fig.~\ref{fig:corrmat} compares the Spearman correlation matrix of
+19 slice variables on 250,000 test slices: the generated matrix differs from \real{} by 0.007 on average and by at
+most 0.044 (all 167 defined pairs within 0.05; blank cells are pairs that are undefined because the
+two-track variables only exist when \texttt{n\_trk}$=2$). Fig.~\ref{fig:corrpairs} shows joint densities of
+reco--reco pairs, including the near-deterministic range--length relation, the two-population structure of the
+vertex charges and of the proton chi2, and the |t|--opening-angle anticorrelation that defines the cohpi signal
+region. Fig.~\ref{fig:corrtruth} shows the conditional the surrogate exists to learn, reconstructed against true
+quantities on the same neutrinos: the exiting-muon band below the diagonal in range momentum, the mirrored band
+of muon/pion mis-assignment in the direction, the vertex pile-up at $z=0$ for out-of-volume interactions, and the
+two populations of vertex charge.
+
+\begin{figure}[p]\centering\includegraphics[width=\textwidth]{figures/m2_official_v3/m2_corr_matrix.png}
+\caption{Spearman correlation matrices of slice variables, \real{} (left), XSuM (middle), difference (right, scale $\pm0.2$), test slices.}\label{fig:corrmat}\end{figure}
+\begin{figure}[p]\centering\includegraphics[height=0.92\textheight]{figures/m2_official_v3/m2_corr_pairs.png}
+\caption{Joint densities of pairs of reconstructed variables, \real{} (left) and XSuM (right), same test neutrinos, same bins and color scale.}\label{fig:corrpairs}\end{figure}
+\begin{figure}[p]\centering\includegraphics[height=0.92\textheight]{figures/m2_official_v3/m2_corr_truth.png}
+\caption{Reconstructed against true quantities, \real{} (left) and XSuM (right), same test neutrinos.}\label{fig:corrtruth}\end{figure}
+\FloatBarrier
+
 \small\input{m2_columns.tex}\normalsize
 
 \paragraph{Generation.} \texttt{scripts/generate\_slc.py} loads the trained surrogate and writes slice records
