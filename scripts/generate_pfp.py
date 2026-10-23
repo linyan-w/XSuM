@@ -24,8 +24,16 @@ def main():
     def nukey(idx):   # (chunk, __ntuple, entry, rec.mc.nu..index) -> one int64
         g = lambda n: idx.get_level_values(n).to_numpy().astype(np.int64)
         return ((g("chunk") * 100000 + g("__ntuple")) * 10000000 + g("entry")) * 16 + g("rec.mc.nu..index")
-    F = pd.read_parquet(f"{a.table_dir}/features.parquet"); fkey = nukey(F.index); order = np.argsort(fkey); fkey = fkey[order]
-    Fx = np.ascontiguousarray(F.to_numpy(np.float32))[order]; fcols = list(F.columns); del F
+    # features: one float32 matrix filled column by column from pyarrow (no pandas copies), keys sorted separately
+    ft = pq.ParquetFile(f"{a.table_dir}/features.parquet"); names = ft.schema_arrow.names
+    idx_cols = ["chunk", "__ntuple", "entry", "rec.mc.nu..index"]; fcols = [c for c in names if c not in idx_cols]
+    nrow = ft.metadata.num_rows; Fx = np.empty((nrow, len(fcols)), dtype=np.float32)
+    for j, c in enumerate(fcols):
+        Fx[:, j] = ft.read(columns=[c]).column(0).to_numpy(zero_copy_only=False).astype(np.float32, copy=False)
+    kk = {c: ft.read(columns=[c]).column(0).to_numpy(zero_copy_only=False).astype(np.int64) for c in idx_cols}
+    fkey_all = ((kk["chunk"] * 100000 + kk["__ntuple"]) * 10000000 + kk["entry"]) * 16 + kk["rec.mc.nu..index"]; del kk
+    order = np.argsort(fkey_all, kind="stable"); fkey = fkey_all[order]; del fkey_all
+    print(f"features {Fx.shape} loaded ({time.time()-t:.0f} s)", flush=True)
     pf = pq.ParquetFile(a.slc); writer, n, done = None, 0, 0
     for rg in range(pf.num_row_groups):
         G = pf.read_row_group(rg).to_pandas()
@@ -33,8 +41,9 @@ def main():
         if a.max_rows and done + len(G) > a.max_rows: G = G.iloc[:a.max_rows - done]
         for i in range(0, len(G), a.batch):
             g = G.iloc[i:i + a.batch]
-            pos = np.searchsorted(fkey, nukey(g.index)); assert np.all(fkey[np.minimum(pos, len(fkey) - 1)] == nukey(g.index)), "neutrino not found in the features table"
-            f = pd.DataFrame(Fx[pos], columns=fcols)
+            key = nukey(g.index); pos = np.minimum(np.searchsorted(fkey, key), len(fkey) - 1)
+            assert np.all(fkey[pos] == key), "neutrino not found in the features table"
+            f = pd.DataFrame(Fx[order[pos]], columns=fcols)
             pfp, ne = sur.generate(f, g, seed=a.seed + done + i)
             tbl = pa.Table.from_pandas(pfp, preserve_index=True)
             if writer is None: writer = pq.ParquetWriter(a.out, tbl.schema)
