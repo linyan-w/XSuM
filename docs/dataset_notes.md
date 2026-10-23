@@ -163,7 +163,14 @@ Datasets on `/pnfs/sbnd/persistent/users/lwan/dataframe/`:
   the real chain, 2,988 in the signal region), written as 2,000 `xsum_surrogate_N.df` files next to the archive
   `prod_v10_14_02_03_official/`, with `mcnu, mcprim, mcdaught, pfp, hdr, ...` copied and `slc_0` generated.
   The real `slc` tables of that archive need the repaired sidecars (`prod_v10_14_02_03_official_slcfix/`).
-No generated `pfp` table yet (M4).
+- `surrogate_official_v3_pfp/`: as `surrogate_official_v3` plus a generated `pfp_0` table from the M4 v2 set
+  model (14,005,625 PFPs for the 5,926,843 generated slices, 69 min on the GPU): columns `trackScore,
+  dist_to_vertex, parent_is_primary, trk_start/end/dir_{x,y,z}, trk_len, trk_rangeP_mu, trk_mcsP_mu, chi2_mu,
+  chi2_pro, chi2_mu_new_I2, chi2_pro_new_I2, chi2_kaon_I2, chi2_pion_I2, pida, chi2_ndof, shw_bestplane_energy,
+  shw_len, shw_open_angle, shw_density, shw_conversion_gap, shw_bestplane_dEdx, shw_start_{x,y,z}, slc_tmatch_idx,
+  pfp_id, surrogate_slot`; end points are straight-line (start + length x direction); PFPs without a fit
+  ("empty", about one per slice in the real data) are not written; induction-plane chi2 and truth-match
+  columns are absent. Index `(__ntuple, entry, rec.slc..index, rec.slc.reco.pfp..index)`.
 
 # The official production (`prod_v10_14_02_03_official`)
 
