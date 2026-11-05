@@ -32,19 +32,34 @@ def pack(chunk, ntuple, entry, nu):
 
 
 class PrimStore:
-    """All primary-token groups, addressable by packed neutrino key (memory: ~17 bytes per token slot)."""
+    """Primary-token arrays addressable by packed neutrino key. Reads the memory-mapped layout written by
+    `to_mmap` (keys.npy sorted, cls.npy, X.npy) so that only the requested rows are paged in."""
     def __init__(self, d):
-        files = sorted(glob.glob(f"{d}/group_??.npz")); keys, cls, X = [], [], []
-        for f in files:
-            z = np.load(f); keys.append(pack(*z["key"].T)); cls.append(z["cls"]); X.append(z["X"])
-        k = np.concatenate(keys); o = np.argsort(k, kind="stable")
-        self.key = k[o]; self.cls = np.concatenate(cls)[o]; self.X = np.concatenate(X)[o]
+        self.key = np.load(f"{d}/mmap/keys.npy"); self.cls = np.load(f"{d}/mmap/cls.npy", mmap_mode="r"); self.X = np.load(f"{d}/mmap/X.npy", mmap_mode="r")
 
     def take(self, key):
         pos = np.minimum(np.searchsorted(self.key, key), len(self.key) - 1)
         ok = self.key[pos] == key
         if not ok.all(): raise KeyError(f"{(~ok).sum()} neutrinos missing from the particle sets")
-        return self.cls[pos], self.X[pos]
+        o = np.argsort(pos, kind="stable"); inv = np.empty_like(o); inv[o] = np.arange(len(o))
+        return np.asarray(self.cls[pos[o]])[inv], np.asarray(self.X[pos[o]])[inv]   # sorted reads, original order
+
+
+def to_mmap(d):
+    """Convert group_NN.npz into one key-sorted memory-mapped layout under <d>/mmap (one group in memory at a time)."""
+    files = sorted(glob.glob(f"{d}/group_??.npz")); os.makedirs(f"{d}/mmap", exist_ok=True)
+    keys = [pack(*np.load(f)["key"].T) for f in files]; sizes = [len(k) for k in keys]; allk = np.concatenate(keys)
+    order = np.argsort(allk, kind="stable"); np.save(f"{d}/mmap/keys.npy", allk[order])
+    dest = np.empty(len(allk), np.int64); dest[order] = np.arange(len(allk))       # global row -> sorted position
+    z0 = np.load(files[0]); N, F = z0["X"].shape[1:]
+    cls = np.lib.format.open_memmap(f"{d}/mmap/cls.npy", mode="w+", dtype=np.int8, shape=(len(allk), N))
+    X = np.lib.format.open_memmap(f"{d}/mmap/X.npy", mode="w+", dtype=np.float32, shape=(len(allk), N, F))
+    off = 0
+    for f, n in zip(files, sizes):
+        z = np.load(f); tgt = dest[off:off + n]; o = np.argsort(tgt)
+        cls[tgt[o]] = z["cls"][o]; X[tgt[o]] = z["X"][o]; off += n; del z
+    cls.flush(); X.flush()
+    return len(allk)
 
 
 def read_features(path, columns=None):
