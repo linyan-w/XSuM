@@ -75,7 +75,7 @@ if os.path.exists(fb):
             r"stage & sel. & eff. & pur. & eff. & pur. & overlap & eff. & pur. & overlap\\\midrule"]
     for k in a:
         r, s = a[k], b.get(k)
-        rows.append(f"{k} & {int(r[0])} & {r[1]:.3f} & {r[2]:.3f} & {r[4]:.3f} & {r[5]:.3f} & {r[6]:.2f} & {s[4]:.3f} & {s[5]:.3f} & {s[6]:.2f}\\\\")
+        rows.append(f"{k.replace(chr(95), chr(92) + chr(95))} & {int(r[0])} & {r[1]:.3f} & {r[2]:.3f} & {r[4]:.3f} & {r[5]:.3f} & {r[6]:.2f} & {s[4]:.3f} & {s[5]:.3f} & {s[6]:.2f}\\\\")
     rows.append(r"\bottomrule\end{tabular}")
     open(f"{OUT}/m3_accept.tex", "w").write("\n".join(rows) + "\n")
     comp["accept"] = {"v3": a, "m3": b, "head": hb}

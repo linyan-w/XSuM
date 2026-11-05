@@ -66,7 +66,7 @@ def main():
         mac += macro("mTwoMatched", fmt(m2["n_matched"])) + macro("mTwoEpochs", fmt(m2["epochs"]))
         pc = m2["per_column"]
         rows = [f"{tex(c)} & {100*v['frac_present_real']:.1f} & {100*v['frac_present_gen']:.1f} & {v['w1']:.4f} \\\\" for c, v in pc.items()]
-        open(f"{a.out}/m2_columns.tex", "w").write("\\begin{longtable}{lccc}\n\\toprule\nColumn & present, real [\\%] & present, generated [\\%] & $W_1$ (transformed units) \\\\\n\\midrule\n\\endhead\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{longtable}\n")
+        open(f"{a.out}/m2_columns.tex", "w").write("\\begin{longtable}{lccc}\n\\toprule\nColumn & present, real [\\%] & present, generated [\\%] & $W_1$ (transformed units) \\\\\n\\midrule\n\\endhead\n" + "\n".join(rows) + "\n\\bottomrule\n\\caption{Every generated slice column against \\real{}, test files.}\\label{tab:m2cols}\n\\end{longtable}\n")
         cf = m2["cohpi_cutflow_test"]; cs = m2.get("cohpi_cutflow_test_signal", {})
         rows = [f"{tex(k)} & {cf['real'][k]:,} & {cf['generated'][k]:,} & {cs.get('real', {}).get(k, '--')} & {cs.get('generated', {}).get(k, '--')} \\\\" for k in cf["real"]]
         open(f"{a.out}/m2_cutflow.tex", "w").write("\\begin{tabular}{lcccc}\n\\toprule\nStage & all, Pandora & all, generated & signal, Pandora & signal, generated \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
@@ -89,7 +89,7 @@ def main():
         pf = m4["per_field"]; w1 = sorted(v["w1"] for v in pf.values() if "w1" in v and v["w1"] == v["w1"])
         mac += macro("mFourWmed", fmt(w1[len(w1) // 2], 3)) + macro("mFourWmax", fmt(w1[-1], 3))
         rows = [f"{tex(k)} & {v['mean_real']:.3f} & {v['mean_gen']:.3f} & -- \\\\" if "mean_real" in v else f"{tex(k)} & {v['real_q16_50_84'][1]:.3f} & {v['fake_q16_50_84'][1]:.3f} & {v['w1']:.4f} \\\\" for k, v in pf.items()]
-        open(f"{a.out}/m4_fields.tex", "w").write("\\begin{longtable}{lccc}\n\\toprule\nField & Pandora median (flags: mean) & generated & $W_1$ (transformed units) \\\\\n\\midrule\n\\endhead\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{longtable}\n")
+        open(f"{a.out}/m4_fields.tex", "w").write("\\begin{longtable}{lccc}\n\\toprule\nField & Pandora median (flags: mean) & generated & $W_1$ (transformed units) \\\\\n\\midrule\n\\endhead\n" + "\n".join(rows) + "\n\\bottomrule\n\\caption{Every generated PFP field against \\real{}, test slices.}\\label{tab:m4fields}\n\\end{longtable}\n")
         rows = [f"{tex(k)} & {cc[k]['mean_real']:.3f} & {cc[k]['mean_gen']:.3f} & " + " / ".join(str(x) for x in cc[k]["dist_real"][:5]) + " & " + " / ".join(str(x) for x in cc[k]["dist_gen"][:5]) + " \\\\" for k in ("n_prong", "n_trk", "n_proton", "n_shower")]
         open(f"{a.out}/m4_counts.tex", "w").write("\\begin{tabular}{lcccc}\n\\toprule\nCount & mean, Pandora & mean, generated & 0/1/2/3/4, Pandora & 0/1/2/3/4, generated \\\\\n\\midrule\n" + "\n".join(rows) + "\n\\bottomrule\n\\end{tabular}\n")
     else:

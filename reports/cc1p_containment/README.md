@@ -28,3 +28,17 @@ Pandora and XSuM on the same test neutrinos: long_dirx +0.06, long_diry +0.05 (s
 p_T but no azimuth (no px, py), so the model cannot know whether a track heads to the cathode, an x wall or a y wall.
 It reproduces the containment *rate* (closure in the table above) but not *which* events are contained, which is
 what a truth-contained signal definition tests. Straight-line end points are a minor effect (<=0.3%).
+
+## After M3 (particle-set inputs), 2026-11-05
+
+Surrogate `surrogate_official_m3_pfp` (M2 + M4 retrained with the 64-d embedding of all final-state primaries).
+Same 200 jobs, same script (`accept_m3.txt`, raw per group `accept_m3_raw.txt`):
+
+| stage | real eff / pur | v3 eff / pur / overlap | M3 eff / pur / overlap |
+|---|---|---|---|
+| 2prong | 0.637 / 0.132 | 0.652 / 0.133 / 0.51 | 0.613 / 0.125 / 0.53 |
+| 2prong-contained | 0.626 / 0.431 | 0.387 / 0.243 / 0.31 | 0.543 / 0.339 / 0.42 |
+| 2prong-mup-PID (final) | 0.346 / 0.890 | 0.202 / 0.502 / 0.23 | 0.305 / 0.780 / 0.41 |
+
+Most of the gap is closed; still ~13% low efficiency and ~20% excess background at the containment cut.
+Per-event real-vs-generated correlation of long_dirx 0.06 -> 0.57, muon_end_y 0.58 -> 0.95.

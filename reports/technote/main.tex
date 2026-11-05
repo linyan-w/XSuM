@@ -8,7 +8,7 @@
 \usepackage{placeins}
 \input{numbers.tex}
 \IfFileExists{m3_numbers.tex}{\input{m3_numbers.tex}}{}
-\providecommand{\mThreeAcceptText}{}
+
 \newcommand{\real}{Pandora}
 
 \title{XSuM: a generative surrogate of the SBND reconstruction chain\\ trained on the BNB Monte Carlo --- technical note}
@@ -310,7 +310,17 @@ signal efficiency, the purity and the fraction of the \real{}-selected neutrinos
 \IfFileExists{m3_accept.tex}{%
 \begin{table}[h]\centering\scriptsize\input{m3_accept.tex}
 \caption{CC1p0pi cut flow on the test files of jobs 0--199 (\mThreeAcceptHead).}\label{tab:m3accept}\end{table}
-\mThreeAcceptText}{}
+
+
+The particle-set inputs close most of the gap. At ``2prong-contained'' the signal efficiency rises from 0.387 to
+0.543 (\real{} 0.626) and the purity from 0.243 to 0.339 (\real{} 0.431); the fraction of \real{}-selected
+neutrinos that the surrogate also selects rises from 0.31 to 0.42, and the gain carries through to the end of
+the selection (final efficiency 0.305 against 0.346, purity 0.780 against 0.890, previously 0.202 and 0.502).
+The selection is not yet closed: the surrogate still contains about 13\% too few signal events and about 20\%
+too much background at the containment cut. The leading remaining effects are that the M4 track end points are
+straight lines (start $+$ length $\times$ direction) whose transverse directions correlate only at the 0.5 level
+with \real{}, and that the encoder is trained before, not with, the flow. Next steps: train the encoder end to
+end with M4 and let the PFP tokens attend to the particle tokens (Sec.~\ref{sec:outlook}).}{}
 \FloatBarrier
 
 \section{Surrogated datasets for the analysers}
@@ -349,6 +359,11 @@ the M4 v2 set model of Sec.~\ref{sec:m4}: 14,005,625 PFPs for the 5,926,843 gene
 generation), with the 26 generated fields laid out under the production column names, straight-line track end
 points, no PFPs without a fit, and no induction-plane chi2 or truth-match columns. This is the first dataset in
 which every reconstructed object of the slice is surrogated.
+
+\texttt{surrogate\_official\_m3\_pfp} (2026-11-05) is the same construction with the M2 and M4 models retrained on
+the particle-set inputs of Sec.~\ref{sec:m3}: 5,923,999 generated slices and 14,061,560 PFPs, 2,000 files in
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m3\_pfp/}. It supersedes
+\texttt{surrogate\_official\_v3\_pfp} for any selection that uses track directions or containment.
 
 \section{Outlook}
 \label{sec:outlook}
