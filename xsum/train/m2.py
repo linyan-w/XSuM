@@ -298,7 +298,9 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     matched = np.ones(len(F), dtype=bool)
     std = Standardizer(X[tr]); C = std(X)
     import gc; gc.collect()
-    print(f"restricted to {len(F)} matched slices", flush=True)
+    import resource
+    def mem(tag): print(f"[mem] {tag}: peak RSS {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6:.1f} GB", flush=True)
+    print(f"restricted to {len(F)} matched slices", flush=True); mem("after load")
 
     # topology: joint categorical over the PFP counts, sampled first and fed to every other component
     topo = Topology(T, tr & matched); ktrue = topo.encode(T)
@@ -309,7 +311,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
                            "logloss_marginal": float(-np.log(np.clip(np.bincount(ktrue[tr & matched], minlength=topo.other + 1)[ktrue[te & matched]] / (tr & matched).sum(), 1e-9, None)).mean()),
                            "accuracy": float((Pt.argmax(1) == ktrue[te & matched]).mean())}
     print("topology:", {k: round(v, 4) for k, v in metrics["topology"].items()}, flush=True)
-    def xh(mask, cap=2_000_000):
+    def xh(mask, cap=1_000_000):
         """features + topology one-hot for the rows of `mask` (subsampled to `cap` rows): built on demand, never for all rows."""
         rows = np.flatnonzero(mask)
         if len(rows) > cap: rows = np.sort(np.random.default_rng(seed).choice(rows, cap, replace=False))
@@ -326,7 +328,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     for c, (test, _) in SPIKES.items():
         v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
         fit_head("spike_" + c, y, matched & ok & (P["two"] if c == "opening_angle" else True))
-    metrics["presence"] = pres_metrics
+    metrics["presence"] = pres_metrics; mem("after heads")
     print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
 
     # ---- flow over the standardised block ----------------------------------------------------------------------
