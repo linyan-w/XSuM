@@ -7,6 +7,8 @@
 \usepackage{xcolor}
 \usepackage{placeins}
 \input{numbers.tex}
+\IfFileExists{m3_numbers.tex}{\input{m3_numbers.tex}}{}
+\providecommand{\mThreeAcceptText}{}
 \newcommand{\real}{Pandora}
 
 \title{XSuM: a generative surrogate of the SBND reconstruction chain\\ trained on the BNB Monte Carlo --- technical note}
@@ -97,8 +99,9 @@ dropped) and the true vertex. The M1 and M2 models use \nFeat{} fixed features d
 and its distances to the cathode and the walls; per species (mu, e, p, n, pi$^\pm$, pi$^0$, gamma, K$^\pm$,
 K$^0$, Lambda, Sigma) the multiplicity above the cohpi thresholds (27 / 30 / 20\,MeV for mu / pi / p), the
 summed and maximum kinetic energy and the leading particle's momentum, $\cos\theta$ and $p_T$; and totals
-(charged multiplicity, visible and total kinetic energy, electromagnetic energy, longitudinal momentum). The
-particle-set encoder (M3) will consume the particles directly.
+(charged multiplicity, visible and total kinetic energy, electromagnetic energy, longitudinal momentum). These
+summary features carry no azimuth; the particle-set encoder M3 (Sec.~\ref{sec:m3}) adds a learned embedding of the
+full list of final-state particles, momentum vectors included.
 
 \paragraph{Targets.} Tier 0: the number of matched slices and, per slice, which groups of variables exist
 (a second track, the two-track topology, hits within 1--4\,cm of the vertex) and the two containment flags.
@@ -252,6 +255,64 @@ PFPs against the same recomputation on the real PFPs; the exactly-two-tracks top
 \small\input{m4_fields.tex}\normalsize
 \FloatBarrier
 
+\section{M3: the full final-state particle list as input}
+\label{sec:m3}
+
+\paragraph{Motivation.} A collaborator's CC1p0pi selection (M.~Fernandez), run on the test files of
+\texttt{surrogate\_official\_v3\_pfp}, agreed with \real{} up to the two-prong stage and diverged at
+``2prong-contained'' (efficiency 0.626 real against 0.387 surrogate, Table~\ref{tab:m3accept}). That cut
+requires the vertex and both track end points inside the fiducial volume and on the same side of the cathode,
+and the signal definition requires the true muon and proton to stop in one TPC. Per-event comparison of
+\real{} and the surrogate on the same neutrinos located the cause: the transverse track directions were
+uncorrelated with the event (Pearson $+0.06$ for $x$, $+0.05$ for $y$, Table~\ref{tab:m3corr}). The summary
+features of Sec.~\ref{sec:io} hold each leading particle's $\cos\theta$ and $p_T$ but no azimuth, so the model
+could reproduce the containment \emph{rate} (Sec.~\ref{sec:m4}) but not \emph{which} events are contained, which is
+what a truth-defined containment signal tests.
+
+\paragraph{Inputs.} For every neutrino the post-FSI primaries (\texttt{mcprim}; neutrinos, nuclear fragments and
+the Bertini binding-energy pseudo-particle dropped) form a set of up to 32 tokens sorted by kinetic energy
+(0.45\% of neutrinos have more and lose their softest particles). Each token has a species class (12 classes as
+in Sec.~\ref{sec:io}) and $(p_x,p_y,p_z,T)$; it is embedded from the class and from its unit direction,
+$\log|p|$, $\log T$ and three geometric path lengths from the true vertex along its direction (to the cathode if
+it heads towards it, to the nearest $x$/$y$ wall, to the nearest $z$ wall). A context token carries the 80
+summary features.
+
+\paragraph{Encoder (stage A).} A 4-layer transformer ($d=128$, 4 heads) over the context and particle tokens,
+pooled to a 64-dimensional embedding, is trained on 3\,M matched slices of the training files for 6 epochs on
+the targets that matter for selection: the topology class (cross entropy), the group presence and containment
+flags (binary cross entropy) and the continuous slice block (masked mean squared error); 7\,min on the RTX~3090.
+The embedding is then frozen and appended to the summary features (144 inputs), and M2 and M4 are retrained
+unchanged on the new inputs (M2: 3\,M slices, 60 epochs; M4: 3\,M slices, 40 epochs). The dataset is then
+regenerated for all 17.9\,M neutrinos (5.92\,M slices, 14.06\,M PFPs).
+
+\begin{table}[h]\centering\small\input{m3_heads.tex}
+\caption{M2 heads on the test files with the summary features only (v3) and with the M3 embedding added.}\label{tab:m3heads}\end{table}
+
+\paragraph{Effect on M2 and M4.} The containment flags gain most (Table~\ref{tab:m3heads}: muon candidate AUC
+0.892$\to$0.965), as expected; the vertex-activity groups, the topology and the number of matched slices
+also improve. The M2 flow validation loss drops from \mThreeFlowA{} to \mThreeFlowB{}. The marginal closure
+of M2 and of M4 is unchanged: the median per-column $W_1$ of M2 is \mThreeWtwoB{} against \mThreeWtwoA{}, the
+median per-field $W_1$ of M4 \mThreeWfourB{} against \mThreeWfourA{} (the tables of Secs.~\ref{sec:m2}
+and~\ref{sec:m4} show the previous versions). Per event, the generated track directions and end points now
+follow the true event (Table~\ref{tab:m3corr}). The cohpi signal efficiency is unchanged
+(Table~\ref{tab:m3cohpi}).
+
+\begin{table}[h]\centering\small\input{m3_corr.tex}
+\caption{Pearson correlation, on the same test slices, between the \real{} value and the generated value.}\label{tab:m3corr}\end{table}
+\begin{table}[h]\centering\small\input{m3_cohpi.tex}
+\caption{cohpi cut flow for true cohpi-signal neutrinos (matched slices), \real{} against the two surrogate versions.}\label{tab:m3cohpi}\end{table}
+
+\paragraph{Acceptance test.} The collaborator's CC1p0pi cut flow
+(\texttt{scripts/check\_cc1p0pi\_stages.py}, a transcription of their notebook) is run on the test files of
+grid jobs 0--199 of the real production and of both surrogated datasets. For each stage the table lists the
+signal efficiency, the purity and the fraction of the \real{}-selected neutrinos that the surrogate also selects
+(overlap; it measures per-event agreement, not just rates).
+\IfFileExists{m3_accept.tex}{%
+\begin{table}[h]\centering\scriptsize\input{m3_accept.tex}
+\caption{CC1p0pi cut flow on the test files of jobs 0--199 (\mThreeAcceptHead).}\label{tab:m3accept}\end{table}
+\mThreeAcceptText}{}
+\FloatBarrier
+
 \section{Surrogated datasets for the analysers}
 \label{sec:dataset}
 
@@ -294,7 +355,7 @@ which every reconstructed object of the slice is surrogated.
 
 \begin{enumerate}
 \item Official sample (9.94\,M triggers): retrain M1/M2, add the \texttt{mcdaught} and full-PFP tables.
-\item M3: particle-set encoder (transformer over primaries + vertex token) replacing the fixed features.
+\item M3 (first version in Sec.~\ref{sec:m3}): train the encoder end to end with the flow; cross-attention from the PFP tokens of M4 to the particle tokens.
 \item M4 (first version in Sec.~\ref{sec:m4}): generated \texttt{pfp} tables in the surrogated datasets, chi2 on the
       induction planes and track end points, cross-attention to particle tokens (M3), Bayesian last layers.
 \item Holdouts: train on $|t|<0.1$, test the tail; low versus high $E_\nu$; forward versus wide-angle muons;

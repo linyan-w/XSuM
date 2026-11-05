@@ -1,0 +1,31 @@
+{
+ "n_signal_all": 4926,
+ "n_signal_test": 484,
+ "real": {
+  "pe_bcfm": 429,
+  "2trk": 206,
+  "dir": 173,
+  "chi2": 164,
+  "sphere": 149,
+  "cathode": 136,
+  "sr": 121
+ },
+ "v3": {
+  "pe_bcfm": 434,
+  "2trk": 212,
+  "dir": 175,
+  "chi2": 168,
+  "sphere": 158,
+  "cathode": 134,
+  "sr": 119
+ },
+ "m3": {
+  "pe_bcfm": 444,
+  "2trk": 209,
+  "dir": 177,
+  "chi2": 155,
+  "sphere": 140,
+  "cathode": 121,
+  "sr": 111
+ }
+}
