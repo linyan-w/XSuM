@@ -12,7 +12,7 @@ step reports/m3_official/encoder.pt         bash -c "mkdir -p reports/m3_officia
 step $D/table_matched_m3/features.parquet   $PY scripts/run_m3.py export reports/m3_official $PS $D/table_matched $D/table_matched_m3
 step $D/table_card_m3/features.parquet      $PY scripts/run_m3.py export reports/m3_official $PS $D/table_card $D/table_card_m3
 step $D/table_m3/features.parquet           $PY scripts/run_m3.py export reports/m3_official $PS $D/table $D/table_m3
-step reports/m2_official_m3/metrics.json    bash -c "mkdir -p reports/m2_official_m3 && $PY scripts/run_m2.py $D/table_matched_m3 reports/m2_official_m3 --epochs 60 --hidden 1024 --layers 6 --card-table $D/table_card_m3 > reports/m2_official_m3/train.log 2>&1"
+step reports/m2_official_m3/metrics.json    bash -c "mkdir -p reports/m2_official_m3 && $PY scripts/run_m2.py $D/table_matched_m3 reports/m2_official_m3 --epochs 60 --hidden 1024 --layers 6 --card-table $D/table_card_m3 --max-rows 4000000 > reports/m2_official_m3/train.log 2>&1"
 step reports/m4_official_m3/metrics.json    bash -c "mkdir -p reports/m4_official_m3 && $PY scripts/run_m4.py $D/table_matched_m3 $D/pfpsets reports/m4_official_m3 --epochs 40 --max-slices 3000000 --d-model 256 > reports/m4_official_m3/train.log 2>&1"
 step data/generated/slc_official_m3_all.parquet  bash -c "$PY scripts/generate_slc.py reports/m2_official_m3 $D/table_m3 data/generated/slc_official_m3_all.parquet --split all > data/generated/gen_slc_m3.log 2>&1"
 step data/generated/pfp_official_m3_all.parquet  bash -c "$PY scripts/generate_pfp.py reports/m4_official_m3 $D/table_m3 data/generated/slc_official_m3_all.parquet data/generated/pfp_official_m3_all.parquet > data/generated/gen_pfp_m3.log 2>&1"

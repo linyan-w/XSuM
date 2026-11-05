@@ -259,8 +259,9 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         print("cardinality head trained on the card table", flush=True)
     card = pd.read_parquet(f"{table_dir}/targets.parquet", columns=["matched", "n_matched_slices"])
     F = pd.read_parquet(f"{table_dir}/features.parquet")
+    sub_rows = None
     if max_rows and len(F) > max_rows:
-        keep = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, card = F.iloc[keep], card.iloc[keep]
+        sub_rows = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, card = F.iloc[sub_rows], card.iloc[sub_rows]
     names = list(F.columns); X = np.ascontiguousarray(F.to_numpy(np.float32))
     F = F[["vtx_x", "vtx_y"]]          # only the vertex signs are needed later (point-mass values)
     file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
@@ -287,11 +288,12 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     F, X = F[keep], X[keep]
     tr, va, te = tr[keep], va[keep], te[keep]
     T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=tcols)
-    if max_rows and len(T) > len(keep): T = T.iloc[np.sort(np.random.default_rng(seed).choice(len(T), len(keep), replace=False))]
+    if sub_rows is not None: T = T.iloc[sub_rows]          # same rows as the features
     T = T[keep]
+    assert T.index.equals(F.index), "targets and features are not row-aligned"
     for c in T.columns: T[c] = T[c].astype(np.float32)
     L = pd.read_parquet(f"{table_dir}/labels.parquet", columns=["is_signal_cohpi"])
-    if max_rows and len(L) > len(keep): L = L.iloc[np.sort(np.random.default_rng(seed).choice(len(L), len(keep), replace=False))]
+    if sub_rows is not None: L = L.iloc[sub_rows]
     L = L[keep]
     matched = np.ones(len(F), dtype=bool)
     std = Standardizer(X[tr]); C = std(X)
