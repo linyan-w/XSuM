@@ -44,13 +44,14 @@ does not fix data/MC disagreement; it reproduces the MC detector response, inclu
 Scope decisions (2026-10-16): XSuM generates the complete reconstruction record, not analysis quantities.
 Selection flags, BDT scores and derived kinematics such as $|t|$ are recomputed downstream by the analysers
 (CC coherent pion: S.~Oh; charged kaons: T.~Wester) from the generated variables. Cosmic-only slices do not
-depend on the neutrino model and are reused from the MC. Generator-internal labels (interaction mode, CC/NC,
+depend on the neutrino model and are to be taken from the MC; they are not yet in the surrogated files. Generator-internal labels (interaction mode, CC/NC,
 $W$, $Q^2$, $E_\nu$, signal flags) are never inputs; they are kept in a separate label table for holdout tests.
 
 \begin{figure}[h]
 \centering\includegraphics[width=\textwidth]{io_schematic.pdf}
-\caption{Inputs, surrogate, generated record and downstream use. One row of the diagram is one true neutrino
-interaction.}
+\caption{XSuM as built: inputs, the chain of models (M3 encoder, M2 heads and flow, M4 set flow), what the surrogated
+files contain (generated, copied, missing), the validation done so far and the downstream use. Only implemented
+components are drawn; the remaining plans are listed in Sec.~\ref{sec:outlook}.}
 \label{fig:io}
 \end{figure}
 
@@ -368,14 +369,18 @@ the particle-set inputs of Sec.~\ref{sec:m3}: 5,923,999 generated slices and 14,
 \section{Outlook}
 \label{sec:outlook}
 
+Done so far: the official sample, M1 baselines, M2 (slice block), M3 (particle-set encoder, stage A), M4 (PFP set),
+and production-format surrogated datasets for the analysers. Remaining:
 \begin{enumerate}
-\item Official sample (9.94\,M triggers): retrain M1/M2, add the \texttt{mcdaught} and full-PFP tables.
-\item M3 (first version in Sec.~\ref{sec:m3}): train the encoder end to end with the flow; cross-attention from the PFP tokens of M4 to the particle tokens.
-\item M4 (first version in Sec.~\ref{sec:m4}): generated \texttt{pfp} tables in the surrogated datasets, chi2 on the
-      induction planes and track end points, cross-attention to particle tokens (M3), Bayesian last layers.
+\item Close the CC1p0pi containment residual (Table~\ref{tab:m3accept}): train the encoder end to end with the
+      flows, let the M4 PFP tokens attend to the particle tokens, and generate track end points instead of
+      deriving them from start, length and direction.
+\item M4 completeness: induction-plane chi2, PFPs without a fit, PFP truth-match columns.
+\item Cosmic-only and unmatched slices in the surrogated files (taken from the MC).
+\item Uncertainty: Bayesian last layers or ensembles, an out-of-support flag per generated record.
 \item Holdouts: train on $|t|<0.1$, test the tail; low versus high $E_\nu$; forward versus wide-angle muons;
       $\le 2$ versus $\ge 3$ charged primaries; one TPC versus the other.
-\item Surrogated dataframes written in the production format for the cohpi and kaon analysers.
+\item Collaborators' comparisons (cohpi, kaon, CC1p0pi) on the test files of \texttt{surrogate\_official\_m3\_pfp}.
 \end{enumerate}
 
 \end{document}
