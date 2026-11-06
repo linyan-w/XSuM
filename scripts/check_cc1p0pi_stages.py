@@ -81,17 +81,18 @@ def best_matched(slc, mcnu):
     return s
 
 
-surr_dir, j0, j1 = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-ts.SURR = f"/pnfs/sbnd/persistent/users/lwan/dataframe/{surr_dir}/xsum_surrogate_{{n}}.df"
-jobs = range(j0, j1)
-mcnu = ts.load_test("real", "mcnu", jobs); mcprim = ts.load_test("real", "mcprim", jobs)
-sig = truth_signal(mcnu, mcprim); sig_ids = set(mcnu.index[sig]); all_ids = set(mcnu.index)
-rslc = best_matched(ts.load_test("real", "slc", jobs, matched_only=False), mcnu)
-rpfp = ts.load_test("real", "pfp", jobs, matched_only=False)
-rpfp = rpfp[rpfp.index.droplevel(-1).isin(rslc.index) & (rpfp.trk_len.notna() | ((rpfp.shw_bestplane_energy > -4) & (rpfp.shw_len > 0)))]
-sslc = ts.load_test("surrogate", "slc", jobs); spfp = ts.load_test("surrogate", "pfp", jobs)
-R, S = stages(rslc, rpfp), stages(sslc, spfp)
-print(f"#jobs {j0}-{j1-1} n_nu {len(all_ids)} n_signal {len(sig_ids)}")
-for k in R:
-    r, s_ = R[k] & all_ids, S[k] & all_ids
-    print(f"{k},{len(r)},{len(r & sig_ids)},{len(s_)},{len(s_ & sig_ids)},{len(r & s_)}", flush=True)
+if __name__ == "__main__":
+    surr_dir, j0, j1 = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+    ts.SURR = f"/pnfs/sbnd/persistent/users/lwan/dataframe/{surr_dir}/xsum_surrogate_{{n}}.df"
+    jobs = range(j0, j1)
+    mcnu = ts.load_test("real", "mcnu", jobs); mcprim = ts.load_test("real", "mcprim", jobs)
+    sig = truth_signal(mcnu, mcprim); sig_ids = set(mcnu.index[sig]); all_ids = set(mcnu.index)
+    rslc = best_matched(ts.load_test("real", "slc", jobs, matched_only=False), mcnu)
+    rpfp = ts.load_test("real", "pfp", jobs, matched_only=False)
+    rpfp = rpfp[rpfp.index.droplevel(-1).isin(rslc.index) & (rpfp.trk_len.notna() | ((rpfp.shw_bestplane_energy > -4) & (rpfp.shw_len > 0)))]
+    sslc = ts.load_test("surrogate", "slc", jobs); spfp = ts.load_test("surrogate", "pfp", jobs)
+    R, S = stages(rslc, rpfp), stages(sslc, spfp)
+    print(f"#jobs {j0}-{j1-1} n_nu {len(all_ids)} n_signal {len(sig_ids)}")
+    for k in R:
+        r, s_ = R[k] & all_ids, S[k] & all_ids
+        print(f"{k},{len(r)},{len(r & sig_ids)},{len(s_)},{len(s_ & sig_ids)},{len(r & s_)}", flush=True)
