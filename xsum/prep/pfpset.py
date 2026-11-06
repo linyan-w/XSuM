@@ -4,9 +4,11 @@ For every neutrino's kept slice (highest tmatch_eff, as in production_table) the
 shower fit are kept (PFPs with neither, trackScore == -5, carry no information; their number is recorded), sorted
 by distance to the vertex and padded to N_MAX. Raw values are stored (NaN where a field does not exist); the
 model-space transform lives in xsum.data.pfpset_tf.
-The track end point is carried as bend_{x,y,z} = end - (start + len * dir), so that generated ends keep the
-scattering offset of real tracks (straight-line ends alone lose about 60% of truth-contained CC1p0pi signal
-containment near the boundaries, reports/cc1p_containment/diag_summary.txt).
+Layout v3: the track end point is a direct target, disp_{x,y,z} = end - start, and the path length is carried as
+len_excess = trk_len - |disp| (cm of path beyond the chord), so trk_len = |disp| + len_excess and end = start + disp
+exactly.  (v2 carried trk_len and bend = end - (start + len*dir); building end from four separately generated pieces
+summed their errors and cost ~6% of truth-contained CC1p0pi signal containment, reports/cc1p_containment/.)
+Group files written by older code (no `layout` entry) are v2 and are converted on load by `v2_to_v3`.
 """
 from __future__ import annotations
 
@@ -20,15 +22,32 @@ FIELDS = [
     ("dist_to_vertex", "dist_to_vertex", "log1p"), ("trackScore", "trackScore", "unit"),
     ("start_x", None, "lin"), ("start_y", None, "lin"), ("start_z", None, "lin"),
     ("dir_x", "trk_dir_x", "lin"), ("dir_y", "trk_dir_y", "lin"), ("dir_z", "trk_dir_z", "lin"),
-    ("trk_len", "trk_len", "log"), ("rangeP_mu", "trk_rangeP_mu", "log"), ("mcsP_mu", "trk_mcsP_mu", "log"),
+    ("len_excess", None, "logp01"), ("rangeP_mu", "trk_rangeP_mu", "log"), ("mcsP_mu", "trk_mcsP_mu", "log"),
     ("chi2_mu", "chi2_mu", "log1p"), ("chi2_pro", "chi2_pro", "log1p"), ("chi2_mu_new", "chi2_mu_new_I2", "log1p"), ("chi2_pro_new", "chi2_pro_new_I2", "log1p"),
     ("chi2_kaon", "chi2_kaon_I2", "log1p"), ("chi2_pion", "chi2_pion_I2", "log1p"), ("pida", "pida", "log1p"), ("chi2_ndof", "chi2_ndof", "log1p"),
     ("shw_energy", "shw_bestplane_energy", "log"), ("shw_len", "shw_len", "log"), ("shw_open_angle", "shw_open_angle", "lin"),
     ("shw_density", "shw_density", "log1p"), ("shw_conversion_gap", "shw_conversion_gap", "log1p"), ("shw_dEdx", "shw_bestplane_dEdx", "log"),
-    # track end point as the offset from the straight line start + len * dir (multiple-scattering bend), cm
-    ("bend_x", None, "asinh5"), ("bend_y", None, "asinh5"), ("bend_z", None, "asinh5"),
+    # track end point relative to its start, cm (the quantity containment cuts use)
+    ("disp_x", None, "asinh10"), ("disp_y", None, "asinh10"), ("disp_z", None, "asinh10"),
 ]
 NAMES = [f[0] for f in FIELDS]
+LAYOUT = "v3"
+
+
+def v2_to_v3(X):
+    """In place: v2 record [.., D] (trk_len, bend) -> v3 (len_excess, disp). Same shape, same field positions."""
+    il = NAMES.index("len_excess"); idisp = [NAMES.index(f"disp_{a}") for a in "xyz"]; idir = [NAMES.index(f"dir_{a}") for a in "xyz"]
+    L = X[..., il].astype(np.float64)
+    d = np.stack([L * X[..., idir[k]] + X[..., idisp[k]] for k in range(3)], -1)        # len*dir + bend = end - start
+    for k in range(3): X[..., idisp[k]] = d[..., k]
+    X[..., il] = np.maximum(L - np.sqrt((d ** 2).sum(-1)), 0.0)
+    return X
+
+
+def track_len(X):
+    """trk_len from a v3 record (NaN where there is no track)."""
+    d = np.stack([X[..., NAMES.index(f"disp_{a}")] for a in "xyz"], -1)
+    return np.sqrt((d ** 2).sum(-1)) + X[..., NAMES.index("len_excess")]
 
 
 def kept_slices(slc: pd.DataFrame, mcnu_index: pd.MultiIndex):
@@ -71,9 +90,11 @@ def build_sets(mcnu: pd.DataFrame, slc: pd.DataFrame, pfp: pd.DataFrame, n_max: 
         if name == "has_trk": v = ht.astype(np.float32)
         elif name == "has_shw": v = hs.astype(np.float32)
         elif name == "has_mcs": v = (q["trk_mcsP_mu"].notna().to_numpy() & ht).astype(np.float32)
-        elif name.startswith("bend_"):
-            a = name[-1]; v = q[f"trk_end_{a}"].to_numpy() - (q[f"trk_start_{a}"].to_numpy() + q["trk_len"].to_numpy() * q[f"trk_dir_{a}"].to_numpy())
-            v = np.where(ht, v, np.nan).astype(np.float32)
+        elif name.startswith("disp_"):
+            a = name[-1]; v = np.where(ht, q[f"trk_end_{a}"].to_numpy() - q[f"trk_start_{a}"].to_numpy(), np.nan).astype(np.float32)
+        elif name == "len_excess":
+            d = np.sqrt(sum((q[f"trk_end_{a}"].to_numpy() - q[f"trk_start_{a}"].to_numpy()) ** 2 for a in "xyz"))
+            v = np.where(ht, np.maximum(q["trk_len"].to_numpy() - d, 0.0), np.nan).astype(np.float32)
         elif name.startswith("start_"):
             a = name[-1]; v = np.where(ht, q[f"trk_start_{a}"].to_numpy(), q[f"shw_start_{a}"].to_numpy())
         else:
@@ -84,4 +105,4 @@ def build_sets(mcnu: pd.DataFrame, slc: pd.DataFrame, pfp: pd.DataFrame, n_max: 
         X[r, c, j] = v
     tp[r, c] = q["truth_pdg"].to_numpy()
     key = np.stack([ks.index.get_level_values(i).to_numpy() for i in range(ks.index.nlevels)], 1).astype(np.int64)
-    return {"key": key, "X": X, "n_fit": n_fit.astype(np.int16), "n_empty": n_empty.astype(np.int16), "truth_pdg": tp}
+    return {"layout": np.array(LAYOUT), "key": key, "X": X, "n_fit": n_fit.astype(np.int16), "n_empty": n_empty.astype(np.int16), "truth_pdg": tp}

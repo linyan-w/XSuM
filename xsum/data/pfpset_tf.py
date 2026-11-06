@@ -16,7 +16,7 @@ EDGE = 1 - 1e-5
 # which flag governs which fields (NaN pattern); None = always present for a fitted PFP
 GOVERNOR = {"mcsP_mu": "has_mcs"}
 GOVERNOR.update({n: "has_shw" for n in NAMES if n.startswith("shw_")})
-GOVERNOR.update({n: "has_trk" for n in ("bend_x", "bend_y", "bend_z", "dir_x", "dir_y", "dir_z", "trk_len", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_mu_new", "chi2_pro_new", "chi2_kaon", "chi2_pion", "pida", "chi2_ndof")})
+GOVERNOR.update({n: "has_trk" for n in ("disp_x", "disp_y", "disp_z", "dir_x", "dir_y", "dir_z", "len_excess", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_mu_new", "chi2_pro_new", "chi2_kaon", "chi2_pion", "pida", "chi2_ndof")})
 
 
 def _dequant(flag, rng):
@@ -29,7 +29,8 @@ def fwd(x, tf):
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
     if tf == "unit": return np.arctanh(np.clip(2 * x - 1, -EDGE, EDGE))
-    if tf == "asinh5": return np.arcsinh(x / 5.0)
+    if tf == "logp01": return np.log(np.where(x >= 0, x, np.nan) + 0.1)
+    if tf.startswith("asinh"): return np.arcsinh(x / float(tf[5:]))
     return x
 
 
@@ -37,7 +38,8 @@ def inv(y, tf):
     if tf == "log": return np.exp(y)
     if tf == "log1p": return np.maximum(np.expm1(y), 0.0)
     if tf == "unit": return 0.5 * (np.tanh(y) + 1)
-    if tf == "asinh5": return 5.0 * np.sinh(y)
+    if tf == "logp01": return np.maximum(np.exp(y) - 0.1, 0.0)
+    if tf.startswith("asinh"): return float(tf[5:]) * np.sinh(y)
     return y
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate PFP tables for a generated slice file (output of generate_slc.py) with a trained M4 model.
 
-usage: python scripts/generate_pfp.py reports/m4_official_v2 <table dir> <generated slc parquet> <out parquet> [--max-rows N]
+usage: python scripts/generate_pfp.py reports/m4_official_v2 <table dir> <generated slc parquet> <out parquet> [--max-rows N] [--primsets DIR]
 The table dir provides the features of the generating neutrinos (features.parquet); rows are matched by neutrino index.
 """
 import argparse
@@ -18,6 +18,7 @@ from xsum.gen.pfp import PfpSurrogate
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("model_dir"); ap.add_argument("table_dir"); ap.add_argument("slc"); ap.add_argument("out")
     ap.add_argument("--max-rows", type=int, default=None); ap.add_argument("--batch", type=int, default=200000); ap.add_argument("--seed", type=int, default=0); ap.add_argument("--cpu", action="store_true")
+    ap.add_argument("--primsets", default=None, help="true particle tokens (mmap layout) for models with particle cross-attention")
     a = ap.parse_args(); t = time.time()
     sur = PfpSurrogate(a.model_dir, device="cpu" if a.cpu else "cuda")
 
@@ -34,6 +35,10 @@ def main():
     fkey_all = ((kk["chunk"] * 100000 + kk["__ntuple"]) * 10000000 + kk["entry"]) * 16 + kk["rec.mc.nu..index"]; del kk
     order = np.argsort(fkey_all, kind="stable"); fkey = fkey_all[order]; del fkey_all
     print(f"features {Fx.shape} loaded ({time.time()-t:.0f} s)", flush=True)
+    store = None
+    if a.primsets:
+        from xsum.train.m3 import PrimStore
+        store = PrimStore(a.primsets)
     pf = pq.ParquetFile(a.slc); writer, n, done = None, 0, 0
     for rg in range(pf.num_row_groups):
         G = pf.read_row_group(rg).to_pandas()
@@ -44,7 +49,7 @@ def main():
             key = nukey(g.index); pos = np.minimum(np.searchsorted(fkey, key), len(fkey) - 1)
             assert np.all(fkey[pos] == key), "neutrino not found in the features table"
             f = pd.DataFrame(Fx[order[pos]], columns=fcols)
-            pfp, ne = sur.generate(f, g, seed=a.seed + done + i)
+            pfp, ne = sur.generate(f, g, seed=a.seed + done + i, particles=store.take(key) if store is not None else None)
             tbl = pa.Table.from_pandas(pfp, preserve_index=True)
             if writer is None: writer = pq.ParquetWriter(a.out, tbl.schema)
             writer.write_table(tbl); n += len(pfp); del pfp, tbl, f

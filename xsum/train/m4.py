@@ -19,7 +19,7 @@ from ..data.splits import split_by_level
 from ..eval import plots
 from ..eval.metrics import sample_vs_real_1d
 from ..models.pfpflow import PfpFlow
-from ..prep.pfpset import FIELDS, N_MAX, NAMES
+from ..prep.pfpset import FIELDS, LAYOUT, N_MAX, NAMES, track_len, v2_to_v3
 from .baselines import Standardizer
 from .m2 import SPEC, TOPO_COLS, BlockTransform, MLPClassifier, Topology, mask_from_presence, presence
 
@@ -33,7 +33,10 @@ def load_sets(pfpsets_dir, max_slices=None, seed=0):
     parts = []
     for f in files:
         d = np.load(f); n = len(d["n_fit"]); keep = np.sort(rng.choice(n, int(round(frac * n)), replace=False)) if frac < 1 else np.arange(n)
-        parts.append({k: d[k][keep] for k in ("key", "X", "n_fit", "n_empty", "truth_pdg")})
+        part = {k: d[k][keep] for k in ("key", "X", "n_fit", "n_empty", "truth_pdg")}
+        layout = str(d["layout"]) if "layout" in d.files else "v2"
+        if layout != LAYOUT: v2_to_v3(part["X"])
+        parts.append(part)
     return {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
 
 
@@ -41,12 +44,14 @@ def cohpi_counts(X, valid):
     """n_prong, n_trk, n_proton, n_shower from a raw PFP-set array (cohpi definitions on PFPs within 50 cm)."""
     g = lambda n: X[..., NAMES.index(n)]
     has_trk = (g("has_trk") > 0.5) & valid; near50 = (g("dist_to_vertex") < 50) & valid
-    near = has_trk & (g("dist_to_vertex") < 6) & (g("trk_len") > 4)
+    near = has_trk & (g("dist_to_vertex") < 6) & (track_len(X) > 4)
     trk = near & (g("trackScore") > 0.5)
     return {"n_prong": near.sum(1), "n_trk": trk.sum(1), "n_proton": (trk & (g("chi2_mu_new") > 25)).sum(1), "n_shower": (near50 & (g("trackScore") < 0.5)).sum(1)}
 
 
-def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_slices=3_000_000, d_model=192, n_layers=4, bs=1024, lr=5e-4):
+def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_slices=3_000_000, d_model=192, n_layers=4, bs=1024, lr=5e-4,
+        primsets_dir=None, n_part_layers=2):
+    """primsets_dir: true particle tokens (xsum.prep.primset, mmap layout) for PFP-to-particle cross-attention; None = off."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True); t0 = time.time()
     S = load_sets(pfpsets_dir, max_slices, seed)
     T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=[c for c, _, _ in SPEC] + TOPO_COLS)
@@ -60,6 +65,13 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     if max_slices and len(sel) > max_slices: sel = np.sort(rng.choice(sel, max_slices, replace=False))
     X = S["X"][sel]; n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
     T = T.iloc[pos[sel]]; F = F.iloc[pos[sel]]; del S
+    if primsets_dir:
+        from .m3 import PrimStore, pack
+        g = lambda n: F.index.get_level_values(n).to_numpy()
+        pcls, pX = PrimStore(primsets_dir).take(pack(g("chunk"), g("__ntuple"), g("entry"), g("rec.mc.nu..index")))
+        pX = np.ascontiguousarray(pX[..., :3]); print(f"particle tokens {pcls.shape}  ({time.time()-t0:.0f} s)", flush=True)
+    else:
+        n_part_layers = 0
     file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
     sp = split_by_level(pd.MultiIndex.from_arrays([file_id], names=["file"]), level="file", seed=seed); tr, va, te = sp["train"], sp["val"], sp["test"]
     # conditioning: features, topology one-hot, slice block
@@ -69,7 +81,7 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     Mg = mask_from_presence(presence(T, bt), bt) * Mfin; Zc = Z * Mg
     cond = np.concatenate([C, H, Zc], 1).astype(np.float32); del C, H, Zc, Z, Mg, Mfin
     print(f"cond dim {cond.shape[1]}, train {tr.sum()} val {va.sum()} test {te.sum()}  ({time.time()-t0:.0f} s)", flush=True)
-    metrics = {"n": int(len(cond)), "cond_dim": int(cond.shape[1]), "epochs": epochs, "d_model": d_model, "n_layers": n_layers}
+    metrics = {"n": int(len(cond)), "cond_dim": int(cond.shape[1]), "epochs": epochs, "d_model": d_model, "n_layers": n_layers, "n_part_layers": n_part_layers, "layout": LAYOUT}
 
     # heads: number of fitted PFPs and of empty PFPs
     heads = {}
@@ -83,16 +95,18 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
 
     # set flow
     pt = PfpTransform().fit(X[tr], seed); Zs, valid = pt.forward(X, rng)
-    model = PfpFlow(Zs.shape[-1], cond.shape[1], d_model, n_layers).to(device)
+    model = PfpFlow(Zs.shape[-1], cond.shape[1], d_model, n_layers, n_part_layers=n_part_layers).to(device)
+    def partb(idx):
+        return (torch.tensor(pcls[idx], device=device).long(), torch.tensor(pX[idx], device=device)) if n_part_layers else None
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5); sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, epochs)
     itr, iva = np.flatnonzero(tr), np.flatnonzero(va)
     def batch(idx):
-        return (torch.tensor(Zs[idx], device=device), torch.tensor(cond[idx], device=device), torch.tensor(valid[idx], device=device))
+        return (torch.tensor(Zs[idx], device=device), torch.tensor(cond[idx], device=device), torch.tensor(valid[idx], device=device), partb(idx))
     hist, best, best_state = [], np.inf, None
     for ep in range(epochs):
         model.train(); perm = rng.permutation(itr); tl = 0.0; nb = 0
         for i in range(0, len(perm), bs):
-            z, c, m = batch(perm[i:i + bs]); loss = model.loss(z, c, m)
+            z, c, m, pp = batch(perm[i:i + bs]); loss = model.loss(z, c, m, pp)
             opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step(); tl += loss.item(); nb += 1
         sched.step(); model.eval()
         with torch.no_grad():
@@ -105,7 +119,7 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     ite = np.flatnonzero(te)
     Pn = heads["n_fit"].predict_proba(cond[ite]); nf_gen = (Pn.cumsum(1) > rng.random(len(Pn))[:, None]).argmax(1)
     pm = np.arange(N_MAX)[None, :] < nf_gen[:, None]
-    Zg = np.concatenate([model.sample(torch.tensor(cond[ite[i:i + 8192]], device=device), torch.tensor(pm[i:i + 8192], device=device)).cpu().numpy() for i in range(0, len(ite), 8192)])
+    Zg = np.concatenate([model.sample(torch.tensor(cond[ite[i:i + 8192]], device=device), torch.tensor(pm[i:i + 8192], device=device), part=partb(ite[i:i + 8192])).cpu().numpy() for i in range(0, len(ite), 8192)])
     Xg = pt.inverse(Zg, pm); Xr = X[ite]; vr = valid[ite]
     percol = {}
     for j, (name, _, tf) in enumerate(FIELDS):
@@ -126,7 +140,7 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     tt = T.iloc[ite]; metrics["cohpi_counts_test"]["two_track_rate"]["slc_table"] = float(((tt.n_prong == 2) & (tt.n_trk == 2) & (tt.n_proton == 0) & (tt.n_shower == 0)).mean())
     print("n_fit real/gen mean:", n_fit[ite].mean().round(3), nf_gen.mean().round(3), " two-track rate real/gen/slc:", round(two_r.mean(), 4), round(two_g.mean(), 4), round(metrics["cohpi_counts_test"]["two_track_rate"]["slc_table"], 4), flush=True)
     print("W1:", {k: round(v["w1"], 3) for k, v in percol.items() if "w1" in v}, flush=True)
-    show = ["dist_to_vertex", "trackScore", "trk_len", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_kaon", "shw_energy", "shw_dEdx", "dir_z", "start_z", "pida"]
+    show = ["dist_to_vertex", "trackScore", "len_excess", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_kaon", "shw_energy", "shw_dEdx", "dir_z", "start_z", "pida"]
     fig, axs = plots.plt.subplots(3, 4, figsize=(14, 9)); axs = axs.ravel()
     for ax, name in zip(axs, show):
         j = NAMES.index(name); tf = FIELDS[j][2]
@@ -138,7 +152,7 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     plots.bar_compare(axs[0], np.bincount(n_fit[ite], minlength=N_MAX + 1), np.bincount(nf_gen, minlength=N_MAX + 1), "fitted PFPs per slice")
     plots.bar_compare(axs[1], np.array(metrics["cohpi_counts_test"]["n_trk"]["dist_real"]), np.array(metrics["cohpi_counts_test"]["n_trk"]["dist_gen"]), "cohpi track candidates (recomputed from PFPs)")
     plots.save(fig, out / "figures" / "m4_counts.png")
-    torch.save({"state": model.state_dict(), "dim": Zs.shape[-1], "cond_dim": cond.shape[1], "d_model": d_model, "n_layers": n_layers, "pt_loc": pt.loc, "pt_scale": pt.scale,
+    torch.save({"state": model.state_dict(), "dim": Zs.shape[-1], "cond_dim": cond.shape[1], "d_model": d_model, "n_layers": n_layers, "n_part_layers": n_part_layers, "layout": LAYOUT, "pt_loc": pt.loc, "pt_scale": pt.scale,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool,
                 "n_fit_head": heads["n_fit"].net.state_dict(), "n_empty_head": heads["n_empty"].net.state_dict()}, out / "model.pt")
     metrics["runtime_s"] = time.time() - t0; (out / "metrics.json").write_text(json.dumps(metrics, indent=1, default=float))
