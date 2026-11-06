@@ -59,7 +59,8 @@ class PfpSurrogate:
         for a in "xyz":   # shower start = the same generated start point
             out[f"shw_start_{a}"] = np.where(has_shw, out[f"trk_start_{a}"], np.nan)
             out[f"trk_start_{a}"] = np.where(has_trk, out[f"trk_start_{a}"], np.nan)
-            out[f"trk_end_{a}"] = np.where(has_trk, out[f"trk_start_{a}"] + out["trk_len"] * out[f"trk_dir_{a}"], np.nan)   # straight-track end point
+            bend = X[rows, slots, NAMES.index(f"bend_{a}")] if f"bend_{a}" in NAMES and X.shape[-1] == len(NAMES) else 0.0
+            out[f"trk_end_{a}"] = np.where(has_trk, out[f"trk_start_{a}"] + out["trk_len"] * out[f"trk_dir_{a}"] + bend, np.nan)   # straight line + generated bend
         out["surrogate_slot"] = slots
         idx = pd.MultiIndex.from_arrays([slc.index.get_level_values(i)[rows] for i in range(slc.index.nlevels)] + [slots], names=list(slc.index.names) + ["rec.slc.reco.pfp..index"])
         return pd.DataFrame(out, index=idx), pd.Series(ne, index=slc.index, name="n_empty_pfp")

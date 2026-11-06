@@ -4,6 +4,9 @@ For every neutrino's kept slice (highest tmatch_eff, as in production_table) the
 shower fit are kept (PFPs with neither, trackScore == -5, carry no information; their number is recorded), sorted
 by distance to the vertex and padded to N_MAX. Raw values are stored (NaN where a field does not exist); the
 model-space transform lives in xsum.data.pfpset_tf.
+The track end point is carried as bend_{x,y,z} = end - (start + len * dir), so that generated ends keep the
+scattering offset of real tracks (straight-line ends alone lose about 60% of truth-contained CC1p0pi signal
+containment near the boundaries, reports/cc1p_containment/diag_summary.txt).
 """
 from __future__ import annotations
 
@@ -22,6 +25,8 @@ FIELDS = [
     ("chi2_kaon", "chi2_kaon_I2", "log1p"), ("chi2_pion", "chi2_pion_I2", "log1p"), ("pida", "pida", "log1p"), ("chi2_ndof", "chi2_ndof", "log1p"),
     ("shw_energy", "shw_bestplane_energy", "log"), ("shw_len", "shw_len", "log"), ("shw_open_angle", "shw_open_angle", "lin"),
     ("shw_density", "shw_density", "log1p"), ("shw_conversion_gap", "shw_conversion_gap", "log1p"), ("shw_dEdx", "shw_bestplane_dEdx", "log"),
+    # track end point as the offset from the straight line start + len * dir (multiple-scattering bend), cm
+    ("bend_x", None, "asinh5"), ("bend_y", None, "asinh5"), ("bend_z", None, "asinh5"),
 ]
 NAMES = [f[0] for f in FIELDS]
 
@@ -66,6 +71,9 @@ def build_sets(mcnu: pd.DataFrame, slc: pd.DataFrame, pfp: pd.DataFrame, n_max: 
         if name == "has_trk": v = ht.astype(np.float32)
         elif name == "has_shw": v = hs.astype(np.float32)
         elif name == "has_mcs": v = (q["trk_mcsP_mu"].notna().to_numpy() & ht).astype(np.float32)
+        elif name.startswith("bend_"):
+            a = name[-1]; v = q[f"trk_end_{a}"].to_numpy() - (q[f"trk_start_{a}"].to_numpy() + q["trk_len"].to_numpy() * q[f"trk_dir_{a}"].to_numpy())
+            v = np.where(ht, v, np.nan).astype(np.float32)
         elif name.startswith("start_"):
             a = name[-1]; v = np.where(ht, q[f"trk_start_{a}"].to_numpy(), q[f"shw_start_{a}"].to_numpy())
         else:
