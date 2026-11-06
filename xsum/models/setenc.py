@@ -29,11 +29,19 @@ def path_lengths(vtx, d):
     return torch.log1p(out)
 
 
+P_SCALE = 0.1     # GeV, fixed scale of the asinh momentum transform (raw mode)
+VTX_SCALE = 250.0  # cm
+
+
 class SetEncoder(nn.Module):
-    def __init__(self, n_classes=12, ctx_dim=80, d_model=128, n_layers=4, n_heads=4, d_out=64):
+    """raw=False (M3 v1): token = class + [unit dir, log|p|, log KE, path lengths], context = 80 summary features.
+    raw=True  (M3 v2, sim2reco convention): token = class + asinh(p/0.1 GeV) for (px, py, pz) only, context = vertex / 250 cm;
+    everything else (energy, angles, distances to walls and cathode) is left for the network to derive."""
+    def __init__(self, n_classes=12, ctx_dim=80, d_model=128, n_layers=4, n_heads=4, d_out=64, raw=False):
         super().__init__()
+        self.raw = raw
         self.emb = nn.Embedding(n_classes + 1, d_model)              # last index = padding (unused)
-        self.tok = nn.Sequential(nn.Linear(3 + 2 + 3, d_model), nn.SiLU(), nn.Linear(d_model, d_model))
+        self.tok = nn.Sequential(nn.Linear(3 if raw else 3 + 2 + 3, d_model), nn.SiLU(), nn.Linear(d_model, d_model))
         self.ctx = nn.Sequential(nn.Linear(ctx_dim, d_model), nn.SiLU(), nn.Linear(d_model, d_model))
         self.layers = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model, n_heads, 2 * d_model, 0.0, activation="gelu", batch_first=True, norm_first=True), n_layers)
         self.out = nn.Sequential(nn.LayerNorm(2 * d_model), nn.Linear(2 * d_model, d_out))
@@ -41,8 +49,12 @@ class SetEncoder(nn.Module):
     def forward(self, cls, X, vtx, ctx):
         """cls [B,N] long (-1 pad), X [B,N,4] (px,py,pz,ke GeV), vtx [B,3] cm, ctx [B,ctx_dim] standardised features."""
         valid = cls >= 0
-        p = X[..., :3]; pm = p.norm(dim=-1, keepdim=True).clamp_min(1e-6); d = p / pm
-        feats = torch.cat([d, torch.log(pm + 1e-3), torch.log(X[..., 3:4].clamp_min(0) + 1e-3), path_lengths(vtx, d)], -1)
+        p = X[..., :3]
+        if self.raw:
+            feats = torch.asinh(p / P_SCALE)
+        else:
+            pm = p.norm(dim=-1, keepdim=True).clamp_min(1e-6); d = p / pm
+            feats = torch.cat([d, torch.log(pm + 1e-3), torch.log(X[..., 3:4].clamp_min(0) + 1e-3), path_lengths(vtx, d)], -1)
         h = self.emb(cls.clamp_min(0)) + self.tok(feats)
         c = self.ctx(ctx)[:, None, :]
         s = torch.cat([c, h], 1); mask = torch.cat([torch.ones_like(valid[:, :1]), valid], 1)
