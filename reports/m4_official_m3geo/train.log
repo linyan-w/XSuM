@@ -1,0 +1,56 @@
+sets 3000001, table 5736854, aligned 3000001  (19 s)
+cond dim 309, train 2399818 val 299690 test 300492  (55 s)
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/cuda/__init__.py:829: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+n_fit {'logloss': 0.1732, 'logloss_marginal': 1.5522, 'accuracy': 0.9325}
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/cuda/__init__.py:829: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+n_empty {'logloss': 0.1177, 'logloss_marginal': 0.1931, 'accuracy': 0.957}
+/home/lwan/SBND/XSuM/xsum/data/pfpset_tf.py:28: RuntimeWarning: invalid value encountered in cast
+  x = np.asarray(x, dtype=np.float64)
+particle tokens (3000000, 32) + Geant4 geometry  (139 s)
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/nn/modules/transformer.py:392: UserWarning: enable_nested_tensor is True, but self.use_nested_tensor is False because encoder_layer.norm_first was True
+  warnings.warn(
+epoch   0 train 0.9251 val 0.7908
+epoch   1 train 0.7587 val 0.7368
+epoch   2 train 0.7222 val 0.7135
+epoch   3 train 0.7040 val 0.6963
+epoch   4 train 0.6914 val 0.6864
+epoch   5 train 0.6807 val 0.6834
+epoch   6 train 0.6739 val 0.6688
+epoch   7 train 0.6667 val 0.6647
+epoch   8 train 0.6623 val 0.6592
+epoch   9 train 0.6582 val 0.6559
+epoch  10 train 0.6543 val 0.6523
+epoch  11 train 0.6490 val 0.6516
+epoch  12 train 0.6463 val 0.6446
+epoch  13 train 0.6435 val 0.6443
+epoch  14 train 0.6408 val 0.6398
+epoch  15 train 0.6373 val 0.6373
+epoch  16 train 0.6351 val 0.6357
+epoch  17 train 0.6317 val 0.6334
+epoch  18 train 0.6295 val 0.6312
+epoch  19 train 0.6273 val 0.6265
+epoch  20 train 0.6249 val 0.6253
+epoch  21 train 0.6242 val 0.6222
+epoch  22 train 0.6210 val 0.6219
+epoch  23 train 0.6195 val 0.6212
+epoch  24 train 0.6179 val 0.6188
+epoch  25 train 0.6161 val 0.6153
+epoch  26 train 0.6139 val 0.6127
+epoch  27 train 0.6126 val 0.6146
+epoch  28 train 0.6106 val 0.6139
+epoch  29 train 0.6101 val 0.6143
+epoch  30 train 0.6081 val 0.6099
+epoch  31 train 0.6069 val 0.6131
+epoch  32 train 0.6065 val 0.6088
+epoch  33 train 0.6048 val 0.6046
+epoch  34 train 0.6038 val 0.6065
+epoch  35 train 0.6034 val 0.6037
+epoch  36 train 0.6025 val 0.6050
+epoch  37 train 0.6020 val 0.6056
+epoch  38 train 0.6015 val 0.6026
+epoch  39 train 0.6008 val 0.6054
+n_fit real/gen mean: 2.342 2.343  two-track rate real/gen/slc: 0.0797 0.0802 0.0797
+W1: {'dist_to_vertex': 0.01, 'trackScore': 0.002, 'start_x': 0.607, 'start_y': 0.855, 'start_z': 0.696, 'dir_x': 0.001, 'dir_y': 0.001, 'dir_z': 0.002, 'len_excess': 0.007, 'rangeP_mu': 0.003, 'mcsP_mu': 0.014, 'chi2_mu': 0.004, 'chi2_pro': 0.006, 'chi2_mu_new': 0.005, 'chi2_pro_new': 0.006, 'chi2_kaon': 0.006, 'chi2_pion': 0.005, 'pida': 0.006, 'chi2_ndof': 0.021, 'shw_energy': 0.006, 'shw_len': 0.006, 'shw_open_angle': 0.004, 'shw_density': 0.002, 'shw_conversion_gap': 0.009, 'shw_dEdx': 0.014, 'disp_x': 0.006, 'disp_y': 0.005, 'disp_z': 0.006}
+done in 8099 s -> reports/m4_official_m3geo
