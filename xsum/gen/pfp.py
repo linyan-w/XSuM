@@ -8,7 +8,7 @@ import torch
 
 from ..data.pfpset_tf import PfpTransform
 from ..models.pfpflow import PfpFlow
-from ..prep.pfpset import FIELDS, LAYOUT, N_MAX, NAMES, track_len
+from ..prep.pfpset import FIELDS, LAYOUT, N_MAX, NAMES, snap_walls, track_len
 from ..train.m2 import SPEC, TOPO_COLS, BlockTransform, MLPClassifier, mask_from_presence
 from ..train.m4 import N_EMPTY_MAX
 
@@ -61,7 +61,7 @@ class PfpSurrogate:
             out = (torch.tensor(particles[0][i:i + bs], device=self.device).long(), torch.tensor(np.ascontiguousarray(particles[1][i:i + bs, :, :3], dtype=np.float32), device=self.device))
             return out + (torch.tensor(np.ascontiguousarray(particles[2][i:i + bs]), device=self.device),) if self.geo else out
         Z = np.concatenate([self.flow.sample(torch.tensor(cond[i:i + bs], device=self.device), torch.tensor(pm[i:i + bs], device=self.device), n_steps=n_steps, part=part(i)).cpu().numpy() for i in range(0, len(cond), bs)]) if len(cond) else np.zeros((0, N_MAX, len(FIELDS)), np.float32)
-        X = self.pt.inverse(Z, pm)
+        X = snap_walls(self.pt.inverse(Z, pm))   # track ends flagged on the TPC wall placed on it
         rows, slots = np.nonzero(pm)
         out = {PFP_COLS[n]: X[rows, slots, NAMES.index(n)] for n in PFP_COLS}
         out["trk_len"] = track_len(X)[rows, slots]

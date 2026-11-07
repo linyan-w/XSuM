@@ -9,6 +9,12 @@ len_excess = trk_len - |disp| (cm of path beyond the chord), so trk_len = |disp|
 exactly.  (v2 carried trk_len and bend = end - (start + len*dir); building end from four separately generated pieces
 summed their errors and cost ~6% of truth-contained CC1p0pi signal containment, reports/cc1p_containment/.)
 Group files written by older code (no `layout` entry) are v2 and are converted on load by `v2_to_v3`.
+Layout v4 adds the TPC wall: real reco tracks that leave the active volume end in a sharp pile-up on its boundary
+(x = +-201.3 cm and z = 0 / 500.5 cm within ~0.5 cm; y in a band ~199-204 cm), which a continuous flow smears over
+the 1-30 cm inside it (exiting muons then pass the fiducial containment cut). Per axis a, wall_a flags a track
+end in the wall band of that axis and wall_off_a is its outward distance from the reference plane WALL_REF; the
+generator snaps the end onto the plane of the side it is on (`snap_walls`). v3 records are extended on load
+(`v3_to_v4`).
 """
 from __future__ import annotations
 
@@ -29,9 +35,17 @@ FIELDS = [
     ("shw_density", "shw_density", "log1p"), ("shw_conversion_gap", "shw_conversion_gap", "log1p"), ("shw_dEdx", "shw_bestplane_dEdx", "log"),
     # track end point relative to its start, cm (the quantity containment cuts use)
     ("disp_x", None, "asinh10"), ("disp_y", None, "asinh10"), ("disp_z", None, "asinh10"),
+    # track end on the TPC wall (layout v4): per-axis flag and outward offset from the reference plane, cm
+    ("wall_x", None, "flag"), ("wall_y", None, "flag"), ("wall_z", None, "flag"),
+    ("wall_off_x", None, "lin"), ("wall_off_y", None, "lin"), ("wall_off_z", None, "lin"),
 ]
 NAMES = [f[0] for f in FIELDS]
-LAYOUT = "v3"
+LAYOUT = "v4"
+N_V3 = NAMES.index("wall_x")          # v2 / v3 records have the first N_V3 fields
+# reference planes (low side, high side) and the band (in cm beyond the plane, outward positive) counted as "on the wall",
+# read off the real reco track-end distributions (pfpsets_v2 group 0)
+WALL_REF = {"x": (-201.3, 201.3), "y": (-201.0, 201.0), "z": (0.0, 500.5)}
+WALL_BAND = {"x": (-0.8, 1.7), "y": (-2.0, 5.0), "z": (-0.75, 3.0)}
 
 
 def v2_to_v3(X):
@@ -41,6 +55,38 @@ def v2_to_v3(X):
     d = np.stack([L * X[..., idir[k]] + X[..., idisp[k]] for k in range(3)], -1)        # len*dir + bend = end - start
     for k in range(3): X[..., idisp[k]] = d[..., k]
     X[..., il] = np.maximum(L - np.sqrt((d ** 2).sum(-1)), 0.0)
+    return X
+
+
+def wall_fields(X):
+    """From a record with start and disp: [..., 6] float32 (wall_x/y/z flags, wall_off_x/y/z; NaN where no track /
+    not on the wall)."""
+    ht = X[..., NAMES.index("has_trk")] > 0.5; out = np.full(X.shape[:-1] + (6,), np.nan, np.float32)
+    for k, a in enumerate("xyz"):
+        e = X[..., NAMES.index(f"start_{a}")] + X[..., NAMES.index(f"disp_{a}")]
+        lo, hi = WALL_REF[a]; mid = 0.5 * (lo + hi)
+        off = np.where(e > mid, e - hi, lo - e)                      # outward distance from the plane of the nearer side
+        on = ht & (off >= WALL_BAND[a][0]) & (off <= WALL_BAND[a][1])
+        out[..., k] = np.where(ht, on, np.nan); out[..., 3 + k] = np.where(on, off, np.nan)
+    return out
+
+
+def v3_to_v4(X3):
+    """v3 record [..., N_V3] -> v4 [..., D] (new array)."""
+    X = np.empty(X3.shape[:-1] + (len(FIELDS),), np.float32); X[..., :N_V3] = X3; X[..., N_V3:] = wall_fields(X3)
+    return X
+
+
+def snap_walls(X):
+    """In place on a generated raw record: for every track end flagged on the wall of axis a, put the end coordinate at
+    the reference plane of the side it is on plus the generated outward offset (disp_a adjusted; start unchanged)."""
+    for a in "xyz":
+        on = X[..., NAMES.index(f"wall_{a}")] > 0.5
+        if not on.any(): continue
+        js, jd = NAMES.index(f"start_{a}"), NAMES.index(f"disp_{a}")
+        e = X[..., js] + X[..., jd]; lo, hi = WALL_REF[a]; off = np.nan_to_num(X[..., NAMES.index(f"wall_off_{a}")], nan=0.0)
+        snapped = np.where(e > 0.5 * (lo + hi), hi + off, lo - off)
+        X[..., jd] = np.where(on & np.isfinite(e), snapped - X[..., js], X[..., jd])
     return X
 
 
@@ -86,7 +132,7 @@ def build_sets(mcnu: pd.DataFrame, slc: pd.DataFrame, pfp: pd.DataFrame, n_max: 
     keepm = pos < n_max
     D = len(FIELDS); X = np.full((len(ks), n_max, D), np.nan, dtype=np.float32); tp = np.zeros((len(ks), n_max), dtype=np.int32)
     r, c = row[keepm], pos[keepm]; q = p[keepm]; ht, hs = has_trk[keepm], has_shw[keepm]
-    for j, (name, col, tf) in enumerate(FIELDS):
+    for j, (name, col, tf) in enumerate(FIELDS[:N_V3]):
         if name == "has_trk": v = ht.astype(np.float32)
         elif name == "has_shw": v = hs.astype(np.float32)
         elif name == "has_mcs": v = (q["trk_mcsP_mu"].notna().to_numpy() & ht).astype(np.float32)
@@ -104,5 +150,6 @@ def build_sets(mcnu: pd.DataFrame, slc: pd.DataFrame, pfp: pd.DataFrame, n_max: 
             else: v = np.where(ht, v, np.nan)
         X[r, c, j] = v
     tp[r, c] = q["truth_pdg"].to_numpy()
+    X[..., N_V3:] = wall_fields(X)
     key = np.stack([ks.index.get_level_values(i).to_numpy() for i in range(ks.index.nlevels)], 1).astype(np.int64)
     return {"layout": np.array(LAYOUT), "key": key, "X": X, "n_fit": n_fit.astype(np.int16), "n_empty": n_empty.astype(np.int16), "truth_pdg": tp}

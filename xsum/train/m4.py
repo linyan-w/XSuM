@@ -19,7 +19,7 @@ from ..data.splits import split_by_level
 from ..eval import plots
 from ..eval.metrics import sample_vs_real_1d
 from ..models.pfpflow import PfpFlow
-from ..prep.pfpset import FIELDS, LAYOUT, N_MAX, NAMES, track_len, v2_to_v3
+from ..prep.pfpset import FIELDS, LAYOUT, N_MAX, NAMES, snap_walls, track_len, v2_to_v3, v3_to_v4
 from .baselines import Standardizer
 from .m2 import SPEC, TOPO_COLS, BlockTransform, MLPClassifier, Topology, mask_from_presence, presence
 
@@ -27,17 +27,24 @@ N_EMPTY_MAX = 3
 
 
 def load_sets(pfpsets_dir, max_slices=None, seed=0):
-    """Concatenate the group files; with max_slices, keep a random fraction of every group (memory: the subsample only)."""
+    """Concatenate the group files; with max_slices, keep a random fraction of every group (memory: the subsample only).
+    Older layouts are converted group by group into one preallocated v4 array (no concatenation copy)."""
     files = sorted(glob.glob(f"{pfpsets_dir}/group_*.npz")); rng = np.random.default_rng(seed)
-    tot = sum(len(np.load(f)["n_fit"]) for f in files); frac = 1.0 if not max_slices or tot <= max_slices else max_slices / tot
-    parts = []
-    for f in files:
-        d = np.load(f); n = len(d["n_fit"]); keep = np.sort(rng.choice(n, int(round(frac * n)), replace=False)) if frac < 1 else np.arange(n)
-        part = {k: d[k][keep] for k in ("key", "X", "n_fit", "n_empty", "truth_pdg")}
-        layout = str(d["layout"]) if "layout" in d.files else "v2"
-        if layout != LAYOUT: v2_to_v3(part["X"])
-        parts.append(part)
-    return {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
+    sizes = [len(np.load(f)["n_fit"]) for f in files]; tot = sum(sizes); frac = 1.0 if not max_slices or tot <= max_slices else max_slices / tot
+    keeps = [np.sort(rng.choice(n, int(round(frac * n)), replace=False)) if frac < 1 else np.arange(n) for n in sizes]
+    ntot = sum(len(k) for k in keeps)
+    out = {"X": np.empty((ntot, N_MAX, len(FIELDS)), np.float32)}; o = 0
+    for f, keep in zip(files, keeps):
+        d = np.load(f); n = len(keep)
+        x = d["X"][keep]; layout = str(d["layout"]) if "layout" in d.files else "v2"
+        if layout == "v2": v2_to_v3(x); layout = "v3"
+        out["X"][o:o + n] = v3_to_v4(x) if layout == "v3" else x; del x
+        for k in ("key", "n_fit", "n_empty", "truth_pdg"):
+            v = d[k][keep]
+            if k not in out: out[k] = np.empty((ntot,) + v.shape[1:], v.dtype)
+            out[k][o:o + n] = v
+        o += n
+    return out
 
 
 def cohpi_counts(X, valid):
@@ -63,18 +70,22 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     rng = np.random.default_rng(seed)
     sel = np.flatnonzero(ok)
     if max_slices and len(sel) > max_slices: sel = np.sort(rng.choice(sel, max_slices, replace=False))
-    X = S["X"] if (len(sel) == len(S["X"])) else S["X"][sel]; n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
-    T = T.iloc[pos[sel]]; F = F.iloc[pos[sel]]; del S
+    X = S["X"]
+    if len(sel) < len(X):   # in-place compaction (sel sorted: every read index >= its write index), no second copy
+        for i in range(0, len(sel), 200_000): c = sel[i:i + 200_000]; X[i:i + len(c)] = X[c]
+        X = X[:len(sel)]
+    n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
+    T = T.iloc[pos[sel]]; Fi = F.index[pos[sel]]; F = F.to_numpy(np.float32)[pos[sel]]; del S
     if primsets_dir:   # keys now; the particle arrays themselves are loaded after the conditioning (memory peak)
         from .m3 import pack
-        g = lambda n: F.index.get_level_values(n).to_numpy()
+        g = lambda n: Fi.get_level_values(n).to_numpy()
         pkeys = pack(g("chunk"), g("__ntuple"), g("entry"), g("rec.mc.nu..index"))
     else:
         n_part_layers = 0; geo = False
-    file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
+    file_id = Fi.get_level_values("chunk").to_numpy() * 100000 + Fi.get_level_values("__ntuple").to_numpy(); del Fi
     sp = split_by_level(pd.MultiIndex.from_arrays([file_id], names=["file"]), level="file", seed=seed); tr, va, te = sp["train"], sp["val"], sp["test"]
     # conditioning: features, topology one-hot, slice block
-    std = Standardizer(F.to_numpy(np.float32)[tr]); C = std(F.to_numpy(np.float32)); del F
+    std = Standardizer(F[tr]); C = std(F); del F
     topo = Topology(T, tr); k = topo.encode(T); H = topo.onehot(k)
     bt = BlockTransform(); Y = bt.matrix(T).astype(np.float32); bt.fit(Y[tr]); Z, Mfin = bt.standardise(Y); del Y
     Mg = mask_from_presence(presence(T, bt), bt) * Mfin; Zc = Z * Mg
@@ -129,7 +140,7 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     Pn = heads["n_fit"].predict_proba(cond[ite]); nf_gen = (Pn.cumsum(1) > rng.random(len(Pn))[:, None]).argmax(1)
     pm = np.arange(N_MAX)[None, :] < nf_gen[:, None]
     Zg = np.concatenate([model.sample(torch.tensor(cond[ite[i:i + 8192]], device=device), torch.tensor(pm[i:i + 8192], device=device), part=partb(ite[i:i + 8192])).cpu().numpy() for i in range(0, len(ite), 8192)])
-    Xg = pt.inverse(Zg, pm); vr = valid[ite]
+    Xg = snap_walls(pt.inverse(Zg, pm)); vr = valid[ite]
     percol = {}
     for j, (name, _, tf) in enumerate(FIELDS):
         r = Xr[..., j][vr]; f = Xg[..., j][pm]; r, f = r[np.isfinite(r)], f[np.isfinite(f)]

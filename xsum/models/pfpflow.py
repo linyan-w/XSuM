@@ -8,6 +8,9 @@ present so that events without particles are well defined.
 With geo=True each particle token also carries its Geant4 truth (xsum.prep.primset.GEO_FIELDS): start and end point
 / 250 cm, asinh(length / 10 cm), contained and crosses_tpc flags, and a has-position flag (positions are missing for
 particles of neutrinos outside the active volume; their inputs are then 0).
+With geo=2 the token also carries the point where the straight line from the Geant4 start to the Geant4 end leaves
+the TPC active volume (/ 250 cm) and an exits flag: for an exiting particle this is where reco tracks end, which
+the end point alone (often metres outside) does not give.
 """
 from __future__ import annotations
 
@@ -18,24 +21,41 @@ from .flow import TimeEmbedding
 from .setenc import P_SCALE
 
 
-GEO_DIM = 10   # start (3), end (3), length, contained, crosses_tpc, has_position
+GEO_DIM = {1: 10, 2: 14}   # start (3), end (3), length, contained, crosses_tpc, has_position [, exit point (3), exits]
+AV_LO = (-201.3, -203.7, 0.0)     # TPC active volume used for the exit point, cm (edges of the real reco track-end pile-ups)
+AV_HI = (201.3, 203.7, 500.8)
 
 
-def geo_features(G):
-    """G [..., 9] int16 (mm, flags; -32768 = missing), numpy or torch -> [..., GEO_DIM] float32 torch tensor."""
+def tpc_exit(s, e):
+    """Straight line s -> e (cm, [..., 3]): (exit point [..., 3], exits [...] bool); exits = s inside and e outside the AV."""
+    lo = torch.tensor(AV_LO, device=s.device); hi = torch.tensor(AV_HI, device=s.device)
+    s_in = ((s > lo) & (s < hi)).all(-1); e_in = ((e > lo) & (e < hi)).all(-1); ex = s_in & ~e_in
+    d = e - s; big = torch.full_like(d, 1e9)
+    t = torch.where(d > 0, (hi - s) / d.clamp_min(1e-9), torch.where(d < 0, (lo - s) / d.clamp_max(-1e-9), big)).amin(-1).clamp(0, 1)
+    p = s + t[..., None] * d
+    return torch.where(ex[..., None], p, torch.zeros_like(p)), ex
+
+
+def geo_features(G, version=1):
+    """G [..., 9] int16 (mm, flags; -32768 = missing), numpy or torch -> [..., GEO_DIM[version]] float32 torch tensor."""
     G = torch.as_tensor(G); miss = G == -32768; g = G.float()
     pos = torch.where(miss[..., :6], torch.zeros_like(g[..., :6]), g[..., :6] / 2500.0)              # mm -> units of 250 cm
     ln = torch.where(miss[..., 6], torch.zeros_like(g[..., 6]), torch.asinh(g[..., 6] / 100.0))      # asinh(length / 10 cm)
     fl = torch.where(miss[..., 7:9], torch.zeros_like(g[..., 7:9]), g[..., 7:9])
     has = (~miss[..., 3]).float()
-    return torch.cat([pos, ln[..., None], fl, has[..., None]], -1)
+    f = [pos, ln[..., None], fl, has[..., None]]
+    if version >= 2:
+        p, ex = tpc_exit(g[..., :3] / 10.0, g[..., 3:6] / 10.0); ex = ex & (has > 0)
+        f += [torch.where(ex[..., None], p / 250.0, torch.zeros_like(p)), ex.float()[..., None]]
+    return torch.cat(f, -1)
 
 
 class ParticleEncoder(nn.Module):
     def __init__(self, d_model, n_layers=2, n_heads=4, n_classes=12, geo=False):
         super().__init__()
         self.emb = nn.Embedding(n_classes, d_model)
-        self.tok = nn.Sequential(nn.Linear(3 + (GEO_DIM if geo else 0), d_model), nn.SiLU(), nn.Linear(d_model, d_model))
+        self.geo = int(geo)
+        self.tok = nn.Sequential(nn.Linear(3 + (GEO_DIM[self.geo] if self.geo else 0), d_model), nn.SiLU(), nn.Linear(d_model, d_model))
         self.null = nn.Parameter(torch.zeros(1, 1, d_model))
         self.enc = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model, n_heads, 2 * d_model, 0.0, activation="gelu", batch_first=True, norm_first=True), n_layers)
         self.norm = nn.LayerNorm(d_model)
@@ -45,7 +65,7 @@ class ParticleEncoder(nn.Module):
         -> memory [B,M+1,d], key padding mask [B,M+1] (True = pad)."""
         valid = cls >= 0
         f = torch.asinh(P[..., :3] / P_SCALE)
-        if G is not None: f = torch.cat([f, geo_features(G)], -1)
+        if G is not None: f = torch.cat([f, geo_features(G, self.geo)], -1)
         h = self.emb(cls.clamp_min(0)) + self.tok(f)
         h = torch.cat([self.null.expand(len(h), -1, -1), h], 1)
         pad = torch.cat([torch.zeros_like(valid[:, :1]), ~valid], 1)
