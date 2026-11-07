@@ -1,0 +1,61 @@
+neutrinos at nu_score in either sample: 35982; true signal 2330
+
+A. 2prong -> contained, each sample on its own 2prong population, by truth category
+category                     real 2pr   cont   frac | XSuM 2pr   cont   frac
+signal (truth-contained)         1535   1508  0.982 |     1503   1321  0.879
+NC (bkg)                         1327    853  0.643 |     1393    958  0.688
+nue CC (bkg)                       61     27  0.443 |       61     30  0.492
+numu CC 1p0pi (any cont.) (bkg)     5664     90  0.016 |     5724    414  0.072
+numu CC Npi (bkg)                 759    207  0.273 |      797    308  0.386
+numu CC other 0pi (bkg)          2278    815  0.358 |     2236    925  0.414
+
+B. neutrinos at 2prong in BOTH samples: 6121 (signal 1042); pass rate of each condition and per-event agreement
+  signal
+    condition      real   XSuM  agree  real only XSuM only
+    c_vtx         1.000  1.000  1.000      0.000     0.000
+    c_t1_start    1.000  0.999  0.999      0.001     0.000
+    c_t1_end      0.992  0.937  0.933      0.061     0.006
+    c_t2_start    0.999  0.999  0.998      0.001     0.001
+    c_t2_end      0.997  0.985  0.988      0.012     0.000
+    c_side        0.995  0.959  0.962      0.037     0.001
+    contained     0.986  0.880  0.885      0.110     0.005
+  background
+    condition      real   XSuM  agree  real only XSuM only
+    c_vtx         1.000  1.000  1.000      0.000     0.000
+    c_t1_start    0.998  0.995  0.994      0.004     0.002
+    c_t1_end      0.320  0.360  0.915      0.022     0.062
+    c_t2_start    0.992  0.992  0.987      0.007     0.006
+    c_t2_end      0.898  0.905  0.954      0.020     0.026
+    c_side        0.709  0.716  0.952      0.020     0.027
+    contained     0.125  0.171  0.926      0.014     0.060
+
+C. per-event real-vs-XSuM agreement of the two longest tracks (neutrinos at 2prong in both)
+    quantity          t1 corr  t2 corr
+    trk_len             0.935    0.787
+    trk_dir_x           0.864    0.845
+    trk_dir_y           0.830    0.755
+    trk_dir_z           0.724    0.567
+    trk_start_x         0.995    0.995
+    trk_start_y         0.993    0.993
+    trk_start_z         0.990    0.989
+    trk_end_x           0.983    0.989
+    trk_end_y           0.978    0.987
+    trk_end_z           0.976    0.983
+    t1: same sign of dir_x 0.912, of dir_y 0.894
+    t2: same sign of dir_x 0.873, of dir_y 0.847
+    r: |end_x - (start_x + len*dir_x)| median 3.9 cm, 90% 18.2 cm
+    s: |end_x - (start_x + len*dir_x)| median 3.7 cm, 90% 17.5 cm
+
+D. length distributions of the two tracks at 2prong (each sample's own population), quantiles 25/50/75/90 [cm]
+    signal     t1: real [ 84.7 120.2 179.  251.7]  XSuM [ 86.6 125.9 180.8 248.2]
+    signal     t2: real [ 5.2 11.5 25.2 43.1]  XSuM [ 5.4 10.9 22.6 42.3]
+    background t1: real [ 63.1 117.9 200.5 292.6]  XSuM [ 62.2 117.9 199.5 293.1]
+    background t2: real [ 4.9 11.7 26.6 51.5]  XSuM [ 5.1 11.5 26.4 51.7]
+
+E. truth-contained signal at 2prong in both: which condition fails (fraction of these neutrinos)
+    fail c_vtx        real 0.000  XSuM 0.000
+    fail c_t1_start   real 0.000  XSuM 0.001
+    fail c_t1_end     real 0.008  XSuM 0.063
+    fail c_t2_start   real 0.001  XSuM 0.001
+    fail c_t2_end     real 0.003  XSuM 0.015
+    fail c_side       real 0.005  XSuM 0.041
