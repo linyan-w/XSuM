@@ -26,7 +26,8 @@ class PfpSurrogate:
         ck = torch.load(f"{model_dir}/model.pt", map_location=device, weights_only=False); self.device = device
         assert ck.get("layout", "v2") == LAYOUT, f"model trained with PFP layout {ck.get('layout', 'v2')}, code is {LAYOUT}: use the matching commit"
         self.n_part_layers = ck.get("n_part_layers", 0)
-        self.flow = PfpFlow(ck["dim"], ck["cond_dim"], ck["d_model"], ck["n_layers"], n_part_layers=self.n_part_layers).to(device); self.flow.load_state_dict(ck["state"]); self.flow.eval()
+        self.geo = ck.get("geo", False)
+        self.flow = PfpFlow(ck["dim"], ck["cond_dim"], ck["d_model"], ck["n_layers"], n_part_layers=self.n_part_layers, geo=self.geo).to(device); self.flow.load_state_dict(ck["state"]); self.flow.eval()
         self.pt = PfpTransform(); self.pt.loc, self.pt.scale = ck["pt_loc"], ck["pt_scale"]
         self.std_m, self.std_s = ck["std_m"], ck["std_s"]
         self.bt = BlockTransform(); self.bt.med, self.bt.mad = ck["bt_med"], ck["bt_mad"]
@@ -47,14 +48,18 @@ class PfpSurrogate:
 
     @torch.no_grad()
     def generate(self, F, slc, seed=0, n_steps=64, bs=8192, particles=None):
-        """particles: (cls [n,M] int, P [n,M,>=3] GeV) true particle tokens of the generating neutrinos (needed when the
+        """particles: (cls [n,M] int, P [n,M,>=3] GeV[, G [n,M,9] int16 Geant4 geometry]) true particle tokens of the generating neutrinos (needed when the
         model cross-attends to them). -> pfp DataFrame (index: slc index + rec.slc.reco.pfp..index) and per-slice n_empty."""
         rng = np.random.default_rng(seed); cond = self.cond(F, slc)
         Pn = self.n_fit.predict_proba(cond); nf = (Pn.cumsum(1) > rng.random(len(Pn))[:, None]).argmax(1)
         Pe = self.n_empty.predict_proba(cond); ne = (Pe.cumsum(1) > rng.random(len(Pe))[:, None]).argmax(1)
         pm = np.arange(N_MAX)[None, :] < nf[:, None]
         if self.n_part_layers: assert particles is not None, "this model needs the true particle tokens"
-        part = lambda i: (torch.tensor(particles[0][i:i + bs], device=self.device).long(), torch.tensor(np.ascontiguousarray(particles[1][i:i + bs, :, :3]), device=self.device)) if self.n_part_layers else None
+        if self.geo: assert len(particles) == 3, "this model needs the Geant4 particle geometry (PrimStore(geo=True))"
+        def part(i):
+            if not self.n_part_layers: return None
+            out = (torch.tensor(particles[0][i:i + bs], device=self.device).long(), torch.tensor(np.ascontiguousarray(particles[1][i:i + bs, :, :3], dtype=np.float32), device=self.device))
+            return out + (torch.tensor(np.ascontiguousarray(particles[2][i:i + bs]), device=self.device),) if self.geo else out
         Z = np.concatenate([self.flow.sample(torch.tensor(cond[i:i + bs], device=self.device), torch.tensor(pm[i:i + bs], device=self.device), n_steps=n_steps, part=part(i)).cpu().numpy() for i in range(0, len(cond), bs)]) if len(cond) else np.zeros((0, N_MAX, len(FIELDS)), np.float32)
         X = self.pt.inverse(Z, pm)
         rows, slots = np.nonzero(pm)

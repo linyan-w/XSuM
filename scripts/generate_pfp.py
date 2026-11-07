@@ -38,7 +38,7 @@ def main():
     store = None
     if a.primsets:
         from xsum.train.m3 import PrimStore
-        store = PrimStore(a.primsets)
+        store = PrimStore(a.primsets, geo=sur.geo)
     pf = pq.ParquetFile(a.slc); writer, n, done = None, 0, 0
     for rg in range(pf.num_row_groups):
         G = pf.read_row_group(rg).to_pandas()
@@ -49,7 +49,7 @@ def main():
             key = nukey(g.index); pos = np.minimum(np.searchsorted(fkey, key), len(fkey) - 1)
             assert np.all(fkey[pos] == key), "neutrino not found in the features table"
             f = pd.DataFrame(Fx[order[pos]], columns=fcols)
-            pfp, ne = sur.generate(f, g, seed=a.seed + done + i, particles=store.take(key) if store is not None else None)
+            pfp, ne = sur.generate(f, g, seed=a.seed + done + i, particles=(store.take(key) + ((store.take_geo(key),) if sur.geo else ())) if store is not None else None)
             tbl = pa.Table.from_pandas(pfp, preserve_index=True)
             if writer is None: writer = pq.ParquetWriter(a.out, tbl.schema)
             writer.write_table(tbl); n += len(pfp); del pfp, tbl, f
