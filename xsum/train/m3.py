@@ -34,8 +34,16 @@ def pack(chunk, ntuple, entry, nu):
 class PrimStore:
     """Primary-token arrays addressable by packed neutrino key. Reads the memory-mapped layout written by
     `to_mmap` (keys.npy sorted, cls.npy, X.npy) so that only the requested rows are paged in."""
-    def __init__(self, d):
+    def __init__(self, d, geo=False):
         self.key = np.load(f"{d}/mmap/keys.npy"); self.cls = np.load(f"{d}/mmap/cls.npy", mmap_mode="r"); self.X = np.load(f"{d}/mmap/X.npy", mmap_mode="r")
+        self.G = np.load(f"{d}/mmap/G.npy", mmap_mode="r") if geo else None
+
+    def take_geo(self, key):
+        """Geant4 particle geometry (int16, xsum.prep.primset.GEO_FIELDS) in the same token order as take()."""
+        pos = np.minimum(np.searchsorted(self.key, key), len(self.key) - 1)
+        if not (self.key[pos] == key).all(): raise KeyError("neutrinos missing from the particle sets")
+        o = np.argsort(pos, kind="stable"); inv = np.empty_like(o); inv[o] = np.arange(len(o))
+        return np.asarray(self.G[pos[o]])[inv]
 
     def take(self, key):
         pos = np.minimum(np.searchsorted(self.key, key), len(self.key) - 1)
@@ -60,6 +68,23 @@ def to_mmap(d):
         cls[tgt[o]] = z["cls"][o]; X[tgt[o]] = z["X"][o]; off += n; del z
     cls.flush(); X.flush()
     return len(allk)
+
+
+def add_geo(d, geo_dir):
+    """Write <d>/mmap/G.npy aligned with keys.npy from the --geo-only group files in geo_dir (one group in memory)."""
+    from ..prep.primset import GEO_FIELDS, GEO_MISSING
+    keys = np.load(f"{d}/mmap/keys.npy"); N = np.load(f"{d}/mmap/cls.npy", mmap_mode="r").shape[1]
+    G = np.lib.format.open_memmap(f"{d}/mmap/G.tmp.npy", mode="w+", dtype=np.int16, shape=(len(keys), N, len(GEO_FIELDS)))
+    G[:] = GEO_MISSING; filled = 0; C = np.load(f"{d}/mmap/cls.npy", mmap_mode="r")
+    for f in sorted(glob.glob(f"{geo_dir}/group_??.npz")):
+        z = np.load(f); k = pack(*z["key"].T); pos = np.searchsorted(keys, k)
+        assert (pos < len(keys)).all() and (keys[np.minimum(pos, len(keys) - 1)] == k).all(), f"{f}: keys not in the particle sets"
+        o = np.argsort(pos)
+        assert np.array_equal(np.asarray(C[pos[o]]), z["cls"][o]), f"{f}: token order differs from the particle sets"
+        G[pos[o]] = z["G"][o]; filled += len(k); del z
+    G.flush(); del G; os.replace(f"{d}/mmap/G.tmp.npy", f"{d}/mmap/G.npy")
+    assert filled == len(keys), f"filled {filled} of {len(keys)}"
+    return filled
 
 
 VTX = ["vtx_x", "vtx_y", "vtx_z"]
