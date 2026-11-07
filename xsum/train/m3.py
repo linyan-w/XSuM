@@ -38,19 +38,26 @@ class PrimStore:
         self.key = np.load(f"{d}/mmap/keys.npy"); self.cls = np.load(f"{d}/mmap/cls.npy", mmap_mode="r"); self.X = np.load(f"{d}/mmap/X.npy", mmap_mode="r")
         self.G = np.load(f"{d}/mmap/G.npy", mmap_mode="r") if geo else None
 
-    def take_geo(self, key):
-        """Geant4 particle geometry (int16, xsum.prep.primset.GEO_FIELDS) in the same token order as take()."""
-        pos = np.minimum(np.searchsorted(self.key, key), len(self.key) - 1)
-        if not (self.key[pos] == key).all(): raise KeyError("neutrinos missing from the particle sets")
-        o = np.argsort(pos, kind="stable"); inv = np.empty_like(o); inv[o] = np.arange(len(o))
-        return np.asarray(self.G[pos[o]])[inv]
-
-    def take(self, key):
+    def _gather(self, arr, key, fields=None, chunk=200_000):
+        """Rows of a memory-mapped array for the given keys, in key order, filled chunk by chunk in place
+        (no full-size temporaries); reads are sorted by position within each chunk."""
         pos = np.minimum(np.searchsorted(self.key, key), len(self.key) - 1)
         ok = self.key[pos] == key
         if not ok.all(): raise KeyError(f"{(~ok).sum()} neutrinos missing from the particle sets")
-        o = np.argsort(pos, kind="stable"); inv = np.empty_like(o); inv[o] = np.arange(len(o))
-        return np.asarray(self.cls[pos[o]])[inv], np.asarray(self.X[pos[o]])[inv]   # sorted reads, original order
+        shape = arr.shape[1:] if fields is None else arr.shape[1:-1] + (len(range(*fields.indices(arr.shape[-1]))),)
+        out = np.empty((len(key),) + shape, dtype=arr.dtype)
+        for i in range(0, len(key), chunk):
+            p = pos[i:i + chunk]; o = np.argsort(p, kind="stable"); blk = arr[p[o]]
+            out[i + o] = blk if fields is None else blk[..., fields]
+        return out
+
+    def take_geo(self, key):
+        """Geant4 particle geometry (int16, xsum.prep.primset.GEO_FIELDS) in the same token order as take()."""
+        return self._gather(self.G, key)
+
+    def take(self, key, fields=None):
+        """(cls, X) for the given keys; fields: optional slice of the X fields (e.g. slice(0, 3) for the momentum)."""
+        return self._gather(self.cls, key), self._gather(self.X, key, fields)
 
 
 def to_mmap(d):

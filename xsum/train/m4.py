@@ -63,14 +63,12 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     rng = np.random.default_rng(seed)
     sel = np.flatnonzero(ok)
     if max_slices and len(sel) > max_slices: sel = np.sort(rng.choice(sel, max_slices, replace=False))
-    X = S["X"][sel]; n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
+    X = S["X"] if (len(sel) == len(S["X"])) else S["X"][sel]; n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
     T = T.iloc[pos[sel]]; F = F.iloc[pos[sel]]; del S
-    if primsets_dir:
-        from .m3 import PrimStore, pack
+    if primsets_dir:   # keys now; the particle arrays themselves are loaded after the conditioning (memory peak)
+        from .m3 import pack
         g = lambda n: F.index.get_level_values(n).to_numpy()
-        store = PrimStore(primsets_dir, geo=geo); kk = pack(g("chunk"), g("__ntuple"), g("entry"), g("rec.mc.nu..index"))
-        pcls, pX = store.take(kk); pX = np.ascontiguousarray(pX[..., :3], dtype=np.float32)
-        pG = store.take_geo(kk) if geo else None; del store; print(f"particle tokens {pcls.shape}  ({time.time()-t0:.0f} s)", flush=True)
+        pkeys = pack(g("chunk"), g("__ntuple"), g("entry"), g("rec.mc.nu..index"))
     else:
         n_part_layers = 0; geo = False
     file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
@@ -95,7 +93,15 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
         print(name, {kk: round(v, 4) for kk, v in metrics[name].items() if isinstance(v, float)}, flush=True)
 
     # set flow
-    pt = PfpTransform().fit(X[tr], seed); Zs, valid = pt.forward(X, rng)
+    itr_all = np.flatnonzero(tr); sub = itr_all if len(itr_all) <= 500_000 else np.sort(np.random.default_rng(seed).choice(itr_all, 500_000, replace=False))
+    pt = PfpTransform().fit(X[sub], seed)
+    Xr = X[np.flatnonzero(te)]              # only the test records are needed later (closure)
+    Zs, valid = pt.forward(X, rng, inplace=True); del X   # model space overwrites the raw records (saves one 3M x 12 x 32 array)
+    if n_part_layers:
+        from .m3 import PrimStore
+        store = PrimStore(primsets_dir, geo=geo); pcls, pX = store.take(pkeys, slice(0, 3))
+        pG = store.take_geo(pkeys) if geo else None; del store, pkeys
+        print(f"particle tokens {pcls.shape}{' + Geant4 geometry' if geo else ''}  ({time.time()-t0:.0f} s)", flush=True)
     model = PfpFlow(Zs.shape[-1], cond.shape[1], d_model, n_layers, n_part_layers=n_part_layers, geo=geo).to(device)
     def partb(idx):
         if not n_part_layers: return None
@@ -123,7 +129,7 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     Pn = heads["n_fit"].predict_proba(cond[ite]); nf_gen = (Pn.cumsum(1) > rng.random(len(Pn))[:, None]).argmax(1)
     pm = np.arange(N_MAX)[None, :] < nf_gen[:, None]
     Zg = np.concatenate([model.sample(torch.tensor(cond[ite[i:i + 8192]], device=device), torch.tensor(pm[i:i + 8192], device=device), part=partb(ite[i:i + 8192])).cpu().numpy() for i in range(0, len(ite), 8192)])
-    Xg = pt.inverse(Zg, pm); Xr = X[ite]; vr = valid[ite]
+    Xg = pt.inverse(Zg, pm); vr = valid[ite]
     percol = {}
     for j, (name, _, tf) in enumerate(FIELDS):
         r = Xr[..., j][vr]; f = Xg[..., j][pm]; r, f = r[np.isfinite(r)], f[np.isfinite(f)]

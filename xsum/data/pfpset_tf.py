@@ -67,10 +67,11 @@ class PfpTransform:
             self.loc[j] = np.median(v); self.scale[j] = 1.4826 * np.median(np.abs(v - self.loc[j])) + 1e-6
         return self
 
-    def forward(self, X, rng, chunk=200_000):
+    def forward(self, X, rng, chunk=200_000, inplace=False):
         """-> Z [n, N, D] float32 (noise where absent or padded), valid [n, N] bool. Chunked: float64 temporaries
-        exist only for `chunk` slices at a time."""
-        Z = np.empty(X.shape, dtype=np.float32); valid = ~np.isnan(X[..., 0])
+        exist only for `chunk` slices at a time. inplace=True overwrites X (float32) with Z to save memory."""
+        valid = ~np.isnan(X[..., 0])
+        Z = X if (inplace and X.dtype == np.float32) else np.empty(X.shape, dtype=np.float32)
         for i in range(0, len(X), chunk):
             U = (self._unscaled(X[i:i + chunk], rng) - self.loc) / self.scale
             z = np.where(np.isfinite(U), U, rng.standard_normal(U.shape)); del U
