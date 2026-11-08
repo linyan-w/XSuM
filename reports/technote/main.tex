@@ -497,6 +497,11 @@ and production-format surrogated datasets for the analysers. Remaining:
       offset for the slice-block end points, longest-track length against the path to the wall), retrain M2,
       regenerate and rerun the acceptance; then the remaining 0.01 in M4.
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
+\item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
+      \texttt{long\_trk\_len} and \texttt{short\_trk\_len} to 0.2\% (median, 90\% quantile 0.8\%) on \real{} slices,
+      yet M1 and M2 generate them as independent numbers and smear the sharp range peak of stopping pions
+      (Fig.~\ref{fig:m1two}; M2 peak fraction 0.17 against 0.22). Derive them after generation through the
+      length--momentum curve fitted on the training slices, and add the M2 version of that figure.
 \item M4 completeness: induction-plane chi2, PFPs without a fit, PFP truth-match columns.
 \item Cosmic-only and unmatched slices in the surrogated files (taken from the MC).
 \item Uncertainty: Bayesian last layers or ensembles, an out-of-support flag per generated record.
