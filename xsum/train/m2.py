@@ -40,6 +40,75 @@ SPEC = [
     ("cpi_end_x", "lin", "two"), ("cpi_end_y", "lin", "two"), ("cpi_end_z", "lin", "two"),
     ("sum_integ_1cm", "log", "s1"), ("sum_integ_2cm", "log", "s2"), ("sum_integ_3cm", "log", "s3"), ("sum_integ_4cm", "log", "s4"),
 ]
+# Wall targets (M2 only; M4 keeps conditioning on SPEC): an exiting longest track has a length equal to the path from the
+# vertex to the TPC wall along its direction, and an exiting cohpi track ends on a wall plane. A flow over the plain
+# coordinates smears both. Per event: a flag that the longest track's length / path is within WALL_LEN_BAND of 1 and the
+# offset (ratio - 1); per axis of the cohpi muon and pion-candidate end points, a flag that the end lies in the wall band
+# (xsum.prep.pfpset.WALL_REF / WALL_BAND, the planes read off the real PFP track ends) and the outward offset. Flags
+# are dequantised flow dimensions, offsets of tracks not on the wall are filled with noise; after generation flagged
+# lengths / coordinates are snapped (apply_walls).
+WALL_LEN_BAND = 0.03
+AV_LO, AV_HI = np.array([-201.3, -203.7, 0.0]), np.array([201.3, 203.7, 500.8])   # active volume for the path to the wall
+WALL_SPEC = [("long_wall", "flag", "base"), ("long_woff", "lin", "base")] + [
+    (f"{p}_end_{k}_{a}", "flag" if k == "wall" else "lin", "two") for p in ("muon", "cpi") for k in ("wall", "woff") for a in "xyz"]
+
+
+def path_to_wall(vtx, d):
+    """Distance from vtx [n,3] along the unit direction d [n,3] to the active-volume boundary (inf where undefined)."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = np.where(d > 0, (AV_HI - vtx) / d, np.where(d < 0, (AV_LO - vtx) / d, np.inf))
+    return np.nan_to_num(t, nan=np.inf).min(1)
+
+
+def add_wall_targets(T, seed=0):
+    """Adds the WALL_SPEC columns (float32) to a slice table with the real reco values."""
+    from ..prep.pfpset import WALL_REF, WALL_BAND
+    rng = np.random.default_rng(seed); n = len(T)
+    L = T["long_trk_len"].to_numpy(np.float64)
+    r = L / path_to_wall(T[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64), T[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64)) - 1
+    has = np.isfinite(L) & (L > 0); on = has & (np.abs(r) < WALL_LEN_BAND)
+    T["long_wall"] = np.where(has, on, np.nan).astype(np.float32)
+    T["long_woff"] = np.where(on, r, rng.uniform(-WALL_LEN_BAND, WALL_LEN_BAND, n)).astype(np.float32)
+    for p in ("muon", "cpi"):
+        for a in "xyz":
+            e = T[f"{p}_end_{a}"].to_numpy(np.float64); lo, hi = WALL_REF[a]; (bl, bh) = WALL_BAND[a]
+            off = np.where(e > 0.5 * (lo + hi), e - hi, lo - e); ok = np.isfinite(e); on = ok & (off >= bl) & (off <= bh)
+            T[f"{p}_end_wall_{a}"] = np.where(ok, on, np.nan).astype(np.float32)
+            T[f"{p}_end_woff_{a}"] = np.where(on, off, rng.uniform(bl, bh, n)).astype(np.float32)
+    return T
+
+
+def apply_walls(df):
+    """In place on a generated slice frame with the WALL_SPEC columns: snap flagged longest-track lengths onto the path
+    to the wall and flagged cohpi end coordinates onto the wall plane plus the offset."""
+    from ..prep.pfpset import WALL_REF
+    if "long_wall" not in df.columns: return df
+    on = df["long_wall"].to_numpy() > 0.5
+    path = path_to_wall(df[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64), df[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64))
+    with np.errstate(invalid="ignore", over="ignore"): new = path * (1 + np.nan_to_num(df["long_woff"].to_numpy(np.float64), nan=0.0))
+    df["long_trk_len"] = np.where(on & np.isfinite(new) & (new > 0), new, df["long_trk_len"].to_numpy())
+    for p in ("muon", "cpi"):
+        for a in "xyz":
+            on = df[f"{p}_end_wall_{a}"].to_numpy() > 0.5; e = df[f"{p}_end_{a}"].to_numpy(np.float64)
+            lo, hi = WALL_REF[a]; off = np.nan_to_num(df[f"{p}_end_woff_{a}"].to_numpy(np.float64), nan=0.0)
+            df[f"{p}_end_{a}"] = np.where(on & np.isfinite(e), np.where(e > 0.5 * (lo + hi), hi + off, lo - off), e)
+    return df
+
+
+def wall_closure(real, gen):
+    """Wall consistency, real vs generated frames: longest track length / path within +-2%, cohpi muon end on the wall
+    (+-3 cm of the active volume) and outside it."""
+    out = {}
+    for lab, d in (("real", real), ("gen", gen)):
+        L = d["long_trk_len"].to_numpy(np.float64); ok = np.isfinite(L) & (L > 0)
+        r = L[ok] / path_to_wall(d[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64)[ok], d[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64)[ok])
+        e = d[["muon_end_x", "muon_end_y", "muon_end_z"]].to_numpy(np.float64); e = e[np.isfinite(e[:, 0])]
+        dw = np.minimum.reduce([AV_HI[0] - np.abs(e[:, 0]), AV_HI[1] - np.abs(e[:, 1]), e[:, 2], AV_HI[2] - e[:, 2]])
+        out[lab] = {"long_len_at_path": float(np.mean(np.abs(r - 1) < 0.02)), "long_len_beyond_path": float(np.mean(r > 1.05)),
+                    "muon_end_on_wall": float(np.mean(np.abs(dw) < 3)), "muon_end_outside": float(np.mean(dw < -3))}
+    return out
+
+
 GROUPS = ["short", "two", "s1", "s2", "s3", "s4"]
 FLAGS = ["is_muon_contained", "is_cpi_contained"]   # Bernoulli, defined on the two-track group
 COUNT_COLS = set()
@@ -55,13 +124,14 @@ def fwd(x, tf):
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
     if tf == "atanh": return np.arctanh(np.clip(x, -EDGE, EDGE))
-    return x
+    return x   # lin, flag
 
 
 def inv(y, tf):
     if tf == "log": return np.exp(y)
     if tf == "log1p": return np.maximum(np.expm1(y), 0.0)
     if tf == "atanh": return np.tanh(y)
+    if tf == "flag": return (y > 0.5).astype(np.float64)
     return y
 
 
@@ -79,13 +149,17 @@ class BlockTransform:
     def __init__(self, spec=SPEC):
         self.spec = spec; self.cols = [c for c, _, _ in spec]; self.groups = np.array([g for _, _, g in spec])
 
-    def matrix(self, df):
+    def matrix(self, df, seed=0):
         Y = np.stack([fwd(df[c].to_numpy(), tf) for c, tf, _ in self.spec], 1)
+        fl = [j for j, (_, tf, _) in enumerate(self.spec) if tf == "flag"]
+        if fl: Y[:, fl] += np.random.default_rng(seed).uniform(-0.4, 0.4, (len(Y), len(fl)))   # dequantised flags
         Y[:, self.cols.index("bcfm_score")][df["bcfm_score"].to_numpy() < -100] = np.nan   # -9999 sentinel: no flash match
         return Y
 
     def fit(self, Y):
         self.med = np.nanmedian(Y, 0); self.mad = 1.4826 * np.nanmedian(np.abs(Y - self.med), 0) + 1e-6
+        for j, (_, tf, _) in enumerate(self.spec):   # flags: mean / std (the MAD of a 0/1 column can vanish)
+            if tf == "flag": self.med[j] = np.nanmean(Y[:, j]); self.mad[j] = np.nanstd(Y[:, j]) + 1e-6
         return self
 
     def standardise(self, Y, clip=12.0):
@@ -237,7 +311,7 @@ def sample_flow(model, C, M, device, n_steps=64, bs=65536):
     return np.concatenate(out)
 
 
-def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None):
+def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=True):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
     then table_dir is expected to hold matched slices only (see scripts/split_official_table.py)."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
@@ -292,6 +366,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     T = T[keep]
     assert T.index.equals(F.index), "targets and features are not row-aligned"
     for c in T.columns: T[c] = T[c].astype(np.float32)
+    if walls: T = add_wall_targets(T, seed)
     L = pd.read_parquet(f"{table_dir}/labels.parquet", columns=["is_signal_cohpi"])
     if sub_rows is not None: L = L.iloc[sub_rows]
     L = L[keep]
@@ -316,7 +391,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         rows = np.flatnonzero(mask)
         if len(rows) > cap: rows = np.sort(np.random.default_rng(seed).choice(rows, cap, replace=False))
         return np.concatenate([X[rows], topo.onehot(ktrue[rows])], 1), rows
-    bt = BlockTransform(); P = presence(T, bt)
+    bt = BlockTransform(SPEC + WALL_SPEC if walls else SPEC); P = presence(T, bt)
     pres_metrics = {}
     def fit_head(name, y, m):
         Xa, ra = xh(tr & m); heads[name] = gbdt(Xa, y[ra], seed, max_iter=300); del Xa
@@ -368,6 +443,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     for fl in FLAGS:
         p = heads[fl].predict_proba(XHg)[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(len(p)) < p).astype(float), np.nan)
         real[fl] = T[fl].to_numpy()[tm]
+    apply_walls(gen)
+    for c in ("long_trk_len", "muon_end_x", "muon_end_y", "muon_end_z", "cpi_end_x", "cpi_end_y", "cpi_end_z"):
+        real[c] = T[c].to_numpy()[tm]            # real values without the transform round trip (exact wall positions)
+    metrics["wall_closure_test"] = wall_closure(real, gen); print("wall closure:", metrics["wall_closure_test"], flush=True)
     metrics["topology_sampled_vs_true_test"] = {"frac_equal": float((kgen == ktrue[tm]).mean()),
                                                 "two_track_tuple_rate": {"real": float(((real.n_prong == 2) & (real.n_trk == 2) & (real.n_proton == 0) & (real.n_shower == 0)).mean()),
                                                                          "generated": float(((gen.n_prong == 2) & (gen.n_trk == 2) & (gen.n_proton == 0) & (gen.n_shower == 0)).mean())}}
@@ -397,7 +476,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     plots.save(fig, out / "figures" / "m2_marginals.png")
     gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
     torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + topo.other + 1, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
-                "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": SPEC}, out / "model.pt")
+                "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": bt.spec}, out / "model.pt")
     import pickle
     topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1], "n_classes": topo.other + 1}, out / "topology_head.pt")
     pickle.dump(heads, open(out / "heads.pkl", "wb"))

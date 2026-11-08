@@ -14,7 +14,7 @@ import torch
 
 from ..models.flow import FlowMatcher
 from ..train.m2 import (BlockTransform, FLAGS, GROUPS, MLPClassifier, SPIKES, SPEC, TOPO_COLS, Topology,
-                        mask_from_presence, sample_flow)
+                        apply_walls, mask_from_presence, sample_flow)
 
 
 class Surrogate:
@@ -70,6 +70,7 @@ def generate(sur: Surrogate, F: pd.DataFrame, seed: int = 0, cardinality: bool =
         out.loc[S[c], c] = value(Fr)[S[c]]
     for fl in FLAGS:
         p = sur.heads[fl].predict_proba(XH)[:, 1]; out[fl] = np.where(P["two"], (rng.random(len(p)) < p).astype(float), np.nan)
+    apply_walls(out)   # no-op for models without the wall targets
     out["topology_class"] = k
     return out
 
