@@ -164,7 +164,7 @@ def fwd(x, tf):
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
     if tf == "atanh": return np.arctanh(np.clip(x, -EDGE, EDGE))
-    return x   # lin, flag
+    return x   # lin, flag, count
 
 
 def inv(y, tf):
@@ -172,6 +172,7 @@ def inv(y, tf):
     if tf == "log1p": return np.maximum(np.expm1(y), 0.0)
     if tf == "atanh": return np.tanh(y)
     if tf == "flag": return (y > 0.5).astype(np.float64)
+    if tf == "count": return np.maximum(np.round(y), 0.0)
     return y
 
 
@@ -191,15 +192,19 @@ class BlockTransform:
 
     def matrix(self, df, seed=0):
         Y = np.stack([fwd(df[c].to_numpy(), tf) for c, tf, _ in self.spec], 1)
+        rng = np.random.default_rng(seed)
         fl = [j for j, (_, tf, _) in enumerate(self.spec) if tf == "flag"]
-        if fl: Y[:, fl] += np.random.default_rng(seed).uniform(-0.4, 0.4, (len(Y), len(fl)))   # dequantised flags
-        Y[:, self.cols.index("bcfm_score")][df["bcfm_score"].to_numpy() < -100] = np.nan   # -9999 sentinel: no flash match
+        if fl: Y[:, fl] += rng.uniform(-0.4, 0.4, (len(Y), len(fl)))   # dequantised flags
+        ct = [j for j, (_, tf, _) in enumerate(self.spec) if tf == "count"]
+        if ct: Y[:, ct] += rng.uniform(-0.5, 0.5, (len(Y), len(ct)))   # dequantised integer counts
+        if "bcfm_score" in self.cols:
+            Y[:, self.cols.index("bcfm_score")][df["bcfm_score"].to_numpy() < -100] = np.nan   # -9999 sentinel: no flash match
         return Y
 
     def fit(self, Y):
         self.med = np.nanmedian(Y, 0); self.mad = 1.4826 * np.nanmedian(np.abs(Y - self.med), 0) + 1e-6
         for j, (_, tf, _) in enumerate(self.spec):   # flags: mean / std (the MAD of a 0/1 column can vanish)
-            if tf == "flag": self.med[j] = np.nanmean(Y[:, j]); self.mad[j] = np.nanstd(Y[:, j]) + 1e-6
+            if tf in ("flag", "count"): self.med[j] = np.nanmean(Y[:, j]); self.mad[j] = np.nanstd(Y[:, j]) + 1e-6
         return self
 
     def standardise(self, Y, clip=12.0):
@@ -214,7 +219,7 @@ class BlockTransform:
             v = inv(Y[:, j], tf)
             out[c] = np.where(M[:, j] > 0, v, np.nan)
         df = pd.DataFrame(out, index=index)
-        for t in ("long", "short"):
+        for t in [t for t in ("long", "short") if f"{t}_dirx" in df.columns]:
             n = np.sqrt(df[f"{t}_dirx"]**2 + df[f"{t}_diry"]**2 + df[f"{t}_dirz"]**2)
             for a in ("x", "y", "z"):
                 df[f"{t}_dir{a}"] = df[f"{t}_dir{a}"] / n.where(n > 0, 1.0)
@@ -357,8 +362,43 @@ def topo_input(C, Z, M):
     return np.concatenate([C, Z * M, M], 1).astype(np.float32)
 
 
+def report(real, gen, T, tm, L, kgen, ktrue, metrics, out):
+    """Closure metrics (wall, topology, per column, cohpi cutflow), marginal figure and test parquets."""
+    for c in ("range_p_mu", "range_p_cpi", "long_trk_len", "muon_end_x", "muon_end_y", "muon_end_z", "cpi_end_x", "cpi_end_y", "cpi_end_z"):
+        real[c] = T[c].to_numpy()[tm]            # real values without the transform round trip (exact wall positions)
+    metrics["wall_closure_test"] = wall_closure(real, gen); print("wall closure:", metrics["wall_closure_test"], flush=True)
+    metrics["topology_sampled_vs_true_test"] = {"frac_equal": float((kgen == ktrue[tm]).mean()),
+                                                "two_track_tuple_rate": {"real": float(((real.n_prong == 2) & (real.n_trk == 2) & (real.n_proton == 0) & (real.n_shower == 0)).mean()),
+                                                                         "generated": float(((gen.n_prong == 2) & (gen.n_trk == 2) & (gen.n_proton == 0) & (gen.n_shower == 0)).mean())}}
+    percol = {}
+    for c in TOPO_COLS:
+        r, f = real[c].to_numpy(), gen[c].to_numpy(); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
+        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
+    for j, (c, tf, g) in enumerate(SPEC):   # compared in transformed units (log / atanh / lin), point masses included
+        r, f = fwd(real[c].to_numpy(), tf), fwd(gen[c].to_numpy(), tf); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
+        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
+    metrics["per_column"] = percol
+    cf_real, cf_gen = cohpi_cutflow(real), cohpi_cutflow(gen)
+    metrics["cohpi_cutflow_test"] = {"real": cf_real, "generated": cf_gen}
+    sig = L.is_signal_cohpi.to_numpy()[tm]
+    metrics["cohpi_cutflow_test_signal"] = {"real": cohpi_cutflow(real[sig]), "generated": cohpi_cutflow(gen[sig]), "n_signal_matched": int(sig.sum())}
+    print("cutflow real:", cf_real); print("cutflow gen: ", cf_gen, flush=True)
+    print("W1 (transformed units):", {c: round(v["w1"], 3) for c, v in percol.items()}, flush=True)
+
+    # figures: a representative set of marginals
+    show = ["vtx_z", "total_pe", "n_pfp", "long_trk_len", "long_dirz", "long_trk_chi2_pro_new", "short_trk_len", "reco_t", "range_p_mu", "opening_angle", "sum_integ_2cm", "nu_score"]
+    fig, axs = plots.plt.subplots(3, 4, figsize=(14, 9)); axs = axs.ravel()
+    for ax, c in zip(axs, show):
+        tf = dict((s[0], s[1]) for s in SPEC).get(c, "lin")
+        r, f = fwd(real[c].dropna(), tf), fwd(gen[c].dropna(), tf); r, f = r[np.isfinite(r)], f[np.isfinite(f)]
+        lo, hi = np.percentile(np.concatenate([r, f]), [0.5, 99.5])
+        plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
+    plots.save(fig, out / "figures" / "m2_marginals.png")
+    gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
+
+
 def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=False,
-        topo_last=False, range_curve=False):
+        topo_last=False, range_curve=False, two_stage=False):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
     then table_dir is expected to hold matched slices only (see scripts/split_official_table.py).
     Defaults = the shipped M2 (m2_official_m3). Studies (technote Sec. 8): walls (M2w), topo_last + range_curve (M2t).
@@ -366,7 +406,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     topo_last: the topology class (joint PFP counts) is sampled AFTER the flow, from the truth features and the
     generated slice block, so that counts follow the generated tracks (e.g. an exiting longest track <-> fewer PFPs);
     presence and spike heads then see the truth features only and the flow is not conditioned on the topology.
-    range_curve: range momenta flagged on / off the length-momentum curve (RANGE_SPEC, apply_range)."""
+    range_curve: range momenta flagged on / off the length-momentum curve (RANGE_SPEC, apply_range).
+    two_stage: stage 1 = one flow over the always-present block, the PFP counts and the group-presence flags; stage 2 =
+    a flow over the optional groups conditioned on the truth and the stage-1 block, masked by the stage-1 presence
+    (run_two_stage)."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
@@ -430,6 +473,8 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     def mem(tag): print(f"[mem] {tag}: peak RSS {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6:.1f} GB", flush=True)
     print(f"restricted to {len(F)} matched slices", flush=True); mem("after load")
 
+    if two_stage:
+        return run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0)
     curves = None
     if range_curve:
         curves = fit_range_curves(T[tr]); T = add_range_targets(T, curves)
@@ -519,37 +564,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         p = heads[fl].predict_proba(XHg)[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(len(p)) < p).astype(float), np.nan)
         real[fl] = T[fl].to_numpy()[tm]
     apply_walls(gen); apply_range(gen, curves)
-    for c in ("range_p_mu", "range_p_cpi", "long_trk_len", "muon_end_x", "muon_end_y", "muon_end_z", "cpi_end_x", "cpi_end_y", "cpi_end_z"):
-        real[c] = T[c].to_numpy()[tm]            # real values without the transform round trip (exact wall positions)
-    metrics["wall_closure_test"] = wall_closure(real, gen); print("wall closure:", metrics["wall_closure_test"], flush=True)
-    metrics["topology_sampled_vs_true_test"] = {"frac_equal": float((kgen == ktrue[tm]).mean()),
-                                                "two_track_tuple_rate": {"real": float(((real.n_prong == 2) & (real.n_trk == 2) & (real.n_proton == 0) & (real.n_shower == 0)).mean()),
-                                                                         "generated": float(((gen.n_prong == 2) & (gen.n_trk == 2) & (gen.n_proton == 0) & (gen.n_shower == 0)).mean())}}
-    percol = {}
-    for c in TOPO_COLS:
-        r, f = real[c].to_numpy(), gen[c].to_numpy(); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
-        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
-    for j, (c, tf, g) in enumerate(SPEC):   # compared in transformed units (log / atanh / lin), point masses included
-        r, f = fwd(real[c].to_numpy(), tf), fwd(gen[c].to_numpy(), tf); ok_r, ok_f = np.isfinite(r), np.isfinite(f)
-        percol[c] = {"frac_present_real": float(ok_r.mean()), "frac_present_gen": float(ok_f.mean()), **sample_vs_real_1d(r[ok_r], f[ok_f])}
-    metrics["per_column"] = percol
-    cf_real, cf_gen = cohpi_cutflow(real), cohpi_cutflow(gen)
-    metrics["cohpi_cutflow_test"] = {"real": cf_real, "generated": cf_gen}
-    sig = L.is_signal_cohpi.to_numpy()[tm]
-    metrics["cohpi_cutflow_test_signal"] = {"real": cohpi_cutflow(real[sig]), "generated": cohpi_cutflow(gen[sig]), "n_signal_matched": int(sig.sum())}
-    print("cutflow real:", cf_real); print("cutflow gen: ", cf_gen, flush=True)
-    print("W1 (transformed units):", {c: round(v["w1"], 3) for c, v in percol.items()}, flush=True)
-
-    # figures: a representative set of marginals
-    show = ["vtx_z", "total_pe", "n_pfp", "long_trk_len", "long_dirz", "long_trk_chi2_pro_new", "short_trk_len", "reco_t", "range_p_mu", "opening_angle", "sum_integ_2cm", "nu_score"]
-    fig, axs = plots.plt.subplots(3, 4, figsize=(14, 9)); axs = axs.ravel()
-    for ax, c in zip(axs, show):
-        tf = dict((s[0], s[1]) for s in SPEC).get(c, "lin")
-        r, f = fwd(real[c].dropna(), tf), fwd(gen[c].dropna(), tf); r, f = r[np.isfinite(r)], f[np.isfinite(f)]
-        lo, hi = np.percentile(np.concatenate([r, f]), [0.5, 99.5])
-        plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
-    plots.save(fig, out / "figures" / "m2_marginals.png")
-    gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
+    report(real, gen, T, tm, L, kgen, ktrue, metrics, out)
     torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + (0 if topo_last else topo.other + 1), "topo_last": bool(topo_last), "range_curves": curves, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": bt.spec}, out / "model.pt")
     import pickle
@@ -559,3 +574,109 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     (out / "metrics.json").write_text(json.dumps(metrics, indent=1, default=float))
     print(f"done in {metrics['runtime_s']:.0f} s -> {out}", flush=True)
     return metrics
+
+
+def stage_specs(walls, range_curve):
+    """(stage-1 spec, stage-2 spec) of the two-stage M2."""
+    full = SPEC + (WALL_SPEC if walls else []) + (RANGE_SPEC if range_curve else [])
+    s1 = [x for x in full if x[2] == "base"] + [(c, "count", "base") for c in TOPO_COLS] + [(f"has_{g}", "flag", "base") for g in GROUPS]
+    return s1, [x for x in full if x[2] != "base"]
+
+
+def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0):
+    matched = np.ones(len(T), dtype=bool); trm, vam, tm = tr & matched, va & matched, te & matched
+    curves = None
+    if range_curve:
+        curves = fit_range_curves(T[tr]); T = add_range_targets(T, curves)
+    P = presence(T, None)
+    for g in GROUPS: T[f"has_{g}"] = P[g].astype(np.float32)
+    s1, s2 = stage_specs(walls, range_curve); bt1, bt2 = BlockTransform(s1), BlockTransform(s2)
+    Y = bt1.matrix(T, seed).astype(np.float32); bt1.fit(Y[trm]); Z1, M1 = bt1.standardise(Y); del Y
+    Y = bt2.matrix(T, seed + 1).astype(np.float32); bt2.fit(Y[trm]); Z2, M2 = bt2.standardise(Y); del Y
+    M2 = mask_from_presence(P, bt2) * M2
+    Sreal = {}
+    for c, (test, _) in SPIKES.items():           # point masses: masked in their stage, sampled by GBDT heads on truth
+        bt = bt1 if c in bt1.cols else bt2; Mx = M1 if c in bt1.cols else M2
+        v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v); Mx[Sreal[c], bt.cols.index(c)] = 0.0
+    topo = Topology(T, trm); ktrue = topo.encode(T)
+    metrics["two_stage"] = {"dim1": len(s1), "dim2": len(s2)}
+    pres = {}
+    def fit_head(name, y, m, Xin):
+        rows = np.flatnonzero(tr & m)
+        if len(rows) > 1_000_000: rows = np.sort(np.random.default_rng(seed).choice(rows, 1_000_000, replace=False))
+        heads[name] = gbdt(Xin(rows), y[rows], seed, max_iter=300); rt = np.flatnonzero(te & m)
+        pres[name] = binary_metrics(y[rt], heads[name].predict_proba(Xin(rt))[:, 1])
+    xo = lambda r: X[r]; xt = lambda r: np.concatenate([X[r], topo.onehot(ktrue[r])], 1)
+    for fl in FLAGS:
+        fit_head(fl, np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int), matched & P["two"], xt)
+    for c, (test, _) in SPIKES.items():
+        v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
+        fit_head("spike_" + c, y, matched & ok & (P["two"] if c == "opening_angle" else True), xo)
+    metrics["presence"] = pres; print("heads:", {k: round(v["auc"], 3) for k, v in pres.items()}, flush=True)
+
+    print("stage 1 flow", flush=True)
+    f1, h1 = train_flow(Z1[trm], M1[trm], C[trm], ktrue[trm], Z1[vam], M1[vam], C[vam], ktrue[vam], 0, epochs, device, hidden, n_layers, seed=seed)
+    C2 = np.concatenate([C, Z1 * M1], 1).astype(np.float32)
+    print("stage 2 flow", flush=True)
+    f2, h2 = train_flow(Z2[trm], M2[trm], C2[trm], ktrue[trm], Z2[vam], M2[vam], C2[vam], ktrue[vam], 0, epochs, device, hidden, n_layers, seed=seed + 1)
+    metrics["flow_val_curve"] = h1; metrics["flow2_val_curve"] = h2; del C2
+
+    # ---- closure on the test split
+    idx = T.index[tm]; rng = np.random.default_rng(seed)
+    gen = sample_two_stage(f1, f2, bt1, bt2, heads, topo, X[tm], C[tm], F[tm], idx, device, rng, curves)
+    kgen = topo.encode(gen)
+    real = pd.concat([bt1.frame(Z1[tm], M1[tm], idx), bt2.frame(Z2[tm], M2[tm], idx)], axis=1)
+    for c in TOPO_COLS: real[c] = T[c].to_numpy()[tm]
+    for c, (test, value) in SPIKES.items(): real.loc[Sreal[c][tm], c] = T[c].to_numpy()[tm][Sreal[c][tm]]
+    for fl in FLAGS: real[fl] = T[fl].to_numpy()[tm]
+    metrics["two_stage_consistency"] = {
+        "ntrk_ge2_without_short": {"real": float(((real.n_trk >= 2) & real.short_trk_len.isna()).mean()), "gen": float(((gen.n_trk >= 2) & gen.short_trk_len.isna()).mean())},
+        "presence_rate": {g: {"real": float(P[g][tm].mean()), "gen": float(gen[f"has_{g}"].mean())} for g in GROUPS}}
+    metrics["two_stage_consistency"]["rule_fixes"] = gen.attrs.get("rule_fixes", {})
+    print("consistency:", metrics["two_stage_consistency"], flush=True)
+    real = real.drop(columns=[f"has_{g}" for g in GROUPS]); gen = gen.drop(columns=[f"has_{g}" for g in GROUPS])
+    report(real, gen, T, tm, L, kgen, ktrue, metrics, out)
+    torch.save({"two_stage": True, "state1": f1.state_dict(), "state2": f2.state_dict(), "dim1": Z1.shape[1], "dim2": Z2.shape[1], "cond_dim": C.shape[1],
+                "spec1": bt1.spec, "spec2": bt2.spec, "bt1": (bt1.med, bt1.mad), "bt2": (bt2.med, bt2.mad), "range_curves": curves,
+                "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
+                "std_m": std.m, "std_s": std.s, "features": names, "spec": bt1.spec + bt2.spec}, out / "model.pt")
+    import pickle
+    pickle.dump(heads, open(out / "heads.pkl", "wb"))
+    metrics["runtime_s"] = time.time() - t0
+    (out / "metrics.json").write_text(json.dumps(metrics, indent=1, default=float))
+    print(f"done in {metrics['runtime_s']:.0f} s -> {out}", flush=True)
+    return metrics
+
+
+def sample_two_stage(f1, f2, bt1, bt2, heads, topo, X, C, Fv, idx, device, rng, curves, n_steps=64):
+    """Two-stage generation: stage 1 (block, counts, presence) -> masks -> stage 2 (optional groups); point masses,
+    containment flags (with the topology class of the generated counts), wall and range snaps."""
+    n = len(X); M1 = np.ones((n, len(bt1.cols)), dtype=np.float32); S = {}
+    for c, (test, value) in SPIKES.items():
+        if c in bt1.cols:
+            S[c] = rng.random(n) < heads["spike_" + c].predict_proba(X)[:, 1]; M1[S[c], bt1.cols.index(c)] = 0.0
+    Z1 = sample_flow(f1, C, M1, device, n_steps=n_steps)
+    g1 = bt1.frame(Z1, M1, idx)
+    # hard relations of the real reco (never violated in the real table): counts nested, a short track whenever
+    # n_trk >= 2, the cohpi two-track block only for n_prong = n_trk = 2; the rate of fixes is kept as a diagnostic
+    fix = {}
+    for c, ub in (("n_prong", "n_pfp"), ("n_trk", "n_pfp"), ("n_proton", "n_trk")):
+        bad = g1[c] > g1[ub]; fix[c] = float(bad.mean()); g1.loc[bad, c] = g1.loc[bad, ub]
+    need = (g1.n_trk >= 2) & (g1.has_short < 0.5); fix["short_for_ntrk2"] = float(need.mean()); g1.loc[need, "has_short"] = 1.0
+    bad = (g1.has_two > 0.5) & ~((g1.n_prong == 2) & (g1.n_trk == 2)); fix["two_outside_2trk"] = float(bad.mean()); g1.loc[bad, "has_two"] = 0.0
+    bad = (g1.has_two > 0.5) & (g1.has_short < 0.5); g1.loc[bad, "has_short"] = 1.0
+    Pg = {g: g1[f"has_{g}"].to_numpy() > 0.5 for g in GROUPS}
+    M2 = mask_from_presence(Pg, bt2)
+    for c, (test, value) in SPIKES.items():
+        if c in bt2.cols:
+            j = bt2.cols.index(c); S[c] = (rng.random(n) < heads["spike_" + c].predict_proba(X)[:, 1]) & (M2[:, j] > 0); M2[S[c], j] = 0.0
+    Z2 = sample_flow(f2, np.concatenate([C, Z1 * M1], 1).astype(np.float32), M2, device, n_steps=n_steps)
+    gen = pd.concat([g1, bt2.frame(Z2, M2, idx)], axis=1)
+    for c, (test, value) in SPIKES.items(): gen.loc[S[c], c] = value(Fv)[S[c]]
+    k = topo.encode(gen); XH = np.concatenate([X, topo.onehot(k)], 1)
+    for fl in FLAGS:
+        p = heads[fl].predict_proba(XH)[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(n) < p).astype(float), np.nan)
+    apply_walls(gen); apply_range(gen, curves)
+    gen["topology_class"] = k
+    gen.attrs["rule_fixes"] = fix
+    return gen

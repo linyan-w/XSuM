@@ -14,7 +14,7 @@ import torch
 
 from ..models.flow import FlowMatcher
 from ..train.m2 import (BlockTransform, FLAGS, GROUPS, MLPClassifier, SPIKES, SPEC, TOPO_COLS, Topology,
-                        apply_range, apply_walls, mask_from_presence, sample_flow, topo_input)
+                        apply_range, apply_walls, mask_from_presence, sample_flow, sample_two_stage, topo_input)
 
 
 class Surrogate:
@@ -23,17 +23,27 @@ class Surrogate:
         ck = torch.load(f"{d}/model.pt", map_location=device, weights_only=False)
         self.device = device
         self.features = ck["features"]; self.std_m, self.std_s = ck["std_m"], ck["std_s"]
-        self.bt = BlockTransform(ck["spec"]); self.bt.med, self.bt.mad = ck["bt_med"], ck["bt_mad"]
-        self.flow = FlowMatcher(ck["dim"], ck["cond_dim"], ck["hidden"], ck["n_layers"]).to(device)
-        self.flow.load_state_dict(ck["state"]); self.flow.eval()
         self.heads = pickle.load(open(f"{d}/heads.pkl", "rb"))
-        th = torch.load(f"{d}/topology_head.pt", map_location=device, weights_only=False)
-        self.topo_head = MLPClassifier(th["n_in"], th["n_classes"], device=device); self.topo_head.net.load_state_dict(th["state"])
+        self.two_stage = bool(ck.get("two_stage", False))
         self.topo = Topology.__new__(Topology)
         self.topo.classes = [tuple(c) for c in ck["topology_classes"]]; self.topo.lookup = {t: i for i, t in enumerate(self.topo.classes)}
         self.topo.other = len(self.topo.classes)
-        self.topo_last, self.range_curves = bool(ck.get("topo_last", False)), ck.get("range_curves")
         self.topo.other_pool = np.asarray(ck.get("topology_other_pool", np.array([self.topo.classes[-1]], dtype=float)), dtype=float)
+        self.range_curves = ck.get("range_curves")
+        if self.two_stage:            # stage 1 (block + counts + presence), stage 2 (optional groups)
+            self.bt1, self.bt2 = BlockTransform(ck["spec1"]), BlockTransform(ck["spec2"])
+            (self.bt1.med, self.bt1.mad), (self.bt2.med, self.bt2.mad) = ck["bt1"], ck["bt2"]
+            self.f1 = FlowMatcher(ck["dim1"], ck["cond_dim"], ck["hidden"], ck["n_layers"]).to(device)
+            self.f2 = FlowMatcher(ck["dim2"], ck["cond_dim"] + ck["dim1"], ck["hidden"], ck["n_layers"]).to(device)
+            self.f1.load_state_dict(ck["state1"]); self.f2.load_state_dict(ck["state2"]); self.f1.eval(); self.f2.eval()
+            self.topo_last = False
+            return
+        self.bt = BlockTransform(ck["spec"]); self.bt.med, self.bt.mad = ck["bt_med"], ck["bt_mad"]
+        self.flow = FlowMatcher(ck["dim"], ck["cond_dim"], ck["hidden"], ck["n_layers"]).to(device)
+        self.flow.load_state_dict(ck["state"]); self.flow.eval()
+        th = torch.load(f"{d}/topology_head.pt", map_location=device, weights_only=False)
+        self.topo_head = MLPClassifier(th["n_in"], th["n_classes"], device=device); self.topo_head.net.load_state_dict(th["state"])
+        self.topo_last = bool(ck.get("topo_last", False))
 
     def standardise(self, X):
         return ((np.arcsinh(X) - self.std_m) / self.std_s).astype(np.float32)
@@ -52,6 +62,10 @@ def generate(sur: Surrogate, F: pd.DataFrame, seed: int = 0, cardinality: bool =
     if len(rows) == 0:
         return pd.DataFrame()
     Xr = X[rows]; C = sur.standardise(Xr); Fr = F.iloc[rows]
+    if sur.two_stage:
+        idx = pd.MultiIndex.from_arrays([F.index.get_level_values(i)[rows] for i in range(F.index.nlevels)] + [draw], names=list(F.index.names) + ["draw"])
+        out = sample_two_stage(sur.f1, sur.f2, sur.bt1, sur.bt2, sur.heads, sur.topo, Xr, C, Fr, idx, sur.device, rng, sur.range_curves, n_steps=n_steps)
+        return out.drop(columns=[c for c in out.columns if c.startswith("has_")])
     if sur.topo_last:                 # topology sampled after the flow, from the truth features and the generated block
         Xpre, Cflow = Xr, C
     else:
