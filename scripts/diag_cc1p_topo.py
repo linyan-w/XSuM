@@ -35,3 +35,14 @@ for lab, m in CATS:
         a = A[p]; t = a[p + "_two"]
         print(f"   {p}: P(slice n_trk=2 | 2prong) {(a.k[t] == 2).mean():.3f}   P(2prong | slice n_trk=2) {t[a.k == 2].mean():.3f}"
               f"   n_good vs n_trk equal {(a[p + '_n_good'] == a[p + '_n_trk']).mean():.3f}")
+
+print("\nby slice n_pfp (2prong is ~ n_pfp = 3): n, longest-track end in FV, P(2prong)   [real | surrogate]")
+for lab, m in CATS:
+    print(f"  {lab}")
+    A = {p: D[m & D[p + "_pre"] & D[p + "_t1_trk_len"].notna()] for p in "rs"}
+    for n in range(2, 7):
+        cells = []
+        for p in "rs":
+            k = np.clip(A[p][p + "_n_pfp"].fillna(-1), 0, 6).astype(int) == n; a = A[p][k]
+            cells.append(f"{len(a):5d} {a[p + '_c_t1_end'].mean() if len(a) else np.nan:6.3f} {a[p + '_two'].mean() if len(a) else np.nan:6.3f}")
+        print(f"    n_pfp {n if n < 6 else '>=6':>3} | {cells[0]} | {cells[1]}")
