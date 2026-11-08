@@ -357,10 +357,12 @@ def topo_input(C, Z, M):
     return np.concatenate([C, Z * M, M], 1).astype(np.float32)
 
 
-def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=True,
-        topo_last=True, range_curve=True):
+def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=False,
+        topo_last=False, range_curve=False):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
     then table_dir is expected to hold matched slices only (see scripts/split_official_table.py).
+    Defaults = the shipped M2 (m2_official_m3). Studies (technote Sec. 8): walls (M2w), topo_last + range_curve (M2t).
+    walls: wall flag / offset targets for the longest-track length and the cohpi end points (WALL_SPEC, apply_walls).
     topo_last: the topology class (joint PFP counts) is sampled AFTER the flow, from the truth features and the
     generated slice block, so that counts follow the generated tracks (e.g. an exiting longest track <-> fewer PFPs);
     presence and spike heads then see the truth features only and the flow is not conditioned on the topology.

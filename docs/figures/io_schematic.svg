@@ -111,7 +111,7 @@
   <text x="32" y="576" class="s">per-column / per-field marginals (W1), group presence and containment heads, cohpi cut flow (all and true-signal),</text>
   <text x="32" y="592" class="s">correlation matrices and joint densities, per-event real-vs-generated correlations on the same neutrinos,</text>
   <text x="32" y="608" class="s">CC1p0pi acceptance (two signal definitions, jobs 0-199), containment diagnostic, track-end floor, hybrid real-slice test</text>
-  <text x="32" y="630" class="s">not done yet: physics holdouts, uncertainty estimates; per-event exit in M2 (CC1p0pi purity gap; M2 wall marginals done, no purity gain)</text>
+  <text x="32" y="630" class="s">not done yet: physics holdouts, uncertainty estimates; joint PFP counts / group presence / longest track in M2 (CC1p0pi purity gap)</text>
 
   <rect x="780" y="536" width="380" height="110" class="box down"/>
   <text x="792" y="556" class="h">Downstream (collaborators)</text>

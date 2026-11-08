@@ -148,3 +148,5 @@ alone +0.027), two group +0.025, long dir +0.024, long length +0.026, others ~0.
 in the generated block. The link is carried jointly, the largest single piece by whether a short track exists, which
 M2t samples from truth alone, independent of the flow's longest track. Next: one joint model for the counts, the
 group presence and the always-present variables (stage 1), optional groups conditioned on it (stage 2).
+
+Deleted 2026-11-08 (superseded studies): /pnfs datasets surrogate_hyb_realslc_m3w0_pfp, surrogate_official_m2w_pfp, surrogate_official_m2t_pfp and their generated parquets; the result files here are kept.
