@@ -73,6 +73,11 @@ def end_point_metrics(Xr, vr, Xg, vg):
            "lateral_real": q(np.linalg.norm(er[both] - er_line[both], axis=1)), "lateral_gen": q(np.linalg.norm(eg[both] - eg_line[both], axis=1)),
            "end_in_fv_real": float(fv(er[np.isfinite(er[:, 0])]).mean()), "end_in_fv_gen": float(fv(eg[np.isfinite(eg[:, 0])]).mean()),
            "line_end_in_fv_gen": float(fv(eg_line[np.isfinite(eg_line[:, 0])]).mean())}
+    # distance of the end to the TPC wall: outside (< -3 cm), on the wall (+-3), 3-10, 10-20 (FV band), > 20 cm
+    wall = lambda e: np.minimum.reduce([201.3 - np.abs(e[:, 0]), 203.7 - np.abs(e[:, 1]), e[:, 2], 500.8 - e[:, 2]])
+    bins = [-1e9, -3, 3, 10, 20, 1e9]; h = lambda e: (np.histogram(wall(e[np.isfinite(e[:, 0])]), bins)[0] / max(np.isfinite(e[:, 0]).sum(), 1)).tolist()
+    out["wall_hist_bins"] = ["<-3", "-3..3", "3..10", "10..20", ">20"]
+    out["wall_hist_real"], out["wall_hist_gen"], out["wall_hist_line_gen"] = h(er), h(eg), h(eg_line)
     return out
 
 
@@ -183,7 +188,8 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
     ep = metrics["end_point"]
     print(f"end point (longest track, same test slices): |gen-real| median {ep['err_end']['median']:.1f} cm (straight line {ep['err_line_end']['median']:.1f}), "
           f">10 cm {ep['err_end']['frac_gt10']:.2f}; lateral real {ep['lateral_real']['median']:.1f} gen {ep['lateral_gen']['median']:.1f}; "
-          f"end in FV real {ep['end_in_fv_real']:.4f} gen {ep['end_in_fv_gen']:.4f} (straight line {ep['line_end_in_fv_gen']:.4f})", flush=True)
+          f"end in FV real {ep['end_in_fv_real']:.4f} gen {ep['end_in_fv_gen']:.4f} (straight line {ep['line_end_in_fv_gen']:.4f}); "
+          f"wall distance <-3/+-3/3-10/10-20/>20: real {np.round(ep['wall_hist_real'], 3).tolist()} gen {np.round(ep['wall_hist_gen'], 3).tolist()} line {np.round(ep['wall_hist_line_gen'], 3).tolist()}", flush=True)
     cr, cg = cohpi_counts(Xr, vr), cohpi_counts(Xg, pm)
     two_r = (cr["n_prong"] == 2) & (cr["n_trk"] == 2) & (cr["n_proton"] == 0) & (cr["n_shower"] == 0)
     two_g = (cg["n_prong"] == 2) & (cg["n_trk"] == 2) & (cg["n_proton"] == 0) & (cg["n_shower"] == 0)
