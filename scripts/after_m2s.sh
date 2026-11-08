@@ -1,5 +1,5 @@
 #!/bin/bash
-# write surrogate_official_m2s_pfp (M2 with wall targets + shipped M4 m3w0): test jobs 0-199 first, acceptance + diagnostic, then the rest
+# write surrogate_official_m2s_pfp (M2S slices + shipped M4 m3w0): test jobs 0-199, acceptance + diagnostic; pass 2 only after review
 S=/scratch/7DayLifetime/lwan/xsum; source $S/xsum_env.sh > /dev/null 2>&1
 GEN=$S/slc_official_m2s_all.parquet; PFP=$S/pfp_official_m2s_all.parquet; NAME=surrogate_official_m2s_pfp
 PROD=/pnfs/sbnd/persistent/users/lwan/dataframe/prod_v10_14_02_03_official
