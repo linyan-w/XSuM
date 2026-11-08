@@ -109,3 +109,14 @@ outside the TPC 4.2% (real 0.06%, unflagged ends not clipped). Purity unchanged;
 Per event (M2 test slices): P(gen long track at wall | real at wall) = 0.56, P(gen at wall | real not) = 0.10. The
 marginal is right, the event assignment is not: the hybrid carries the per-event exit from the real detector, the
 generated chain must infer it from generator truth. Next: a generator-truth exit predictor (CSDA range vs path to wall).
+
+## Why 2prong CC Npi is over-contained (topology x containment), 2026-11-08
+
+`diag_cc1p_containment.py` now stores the slice counts; `diag_cc1p_topo.py` cross-tabulates them with the PFP-level
+2prong (`topo_m2w.txt`, `topo_hyb.txt`; hybrid rebuilt with `pipeline_hyb.sh`). Overall longest-track containment
+closes per category (CC Npi 0.514 vs 0.513); only the 2prong subset of CC Npi fails (0.518 vs 0.440; hybrid 0.454).
+2prong is set by the slice n_pfp (P(2prong | n_pfp=3) = 0.93 real, 0.90 M2w) and M4 follows it. CC Npi, longest
+track end in FV by slice n_pfp (real | M2w | hybrid): n_pfp=3 0.439 | 0.491 | 0.442; 4 0.499 | 0.508 | 0.495;
+5 0.554 | 0.514 | 0.533. Real: few PFPs <-> exiting longest track; M2 generates the exit flat in n_pfp. The hybrid
+(same M4, real slices) closes in every cell -> the missing correlation is between M2's topology class and M2's
+longest-track length, not in M4 and not training statistics (~75k CC Npi 2prong-like training slices).

@@ -29,7 +29,9 @@ def tracks(slc, pfp):
                                                         s.tmatch_idx.fillna(-1).astype(int).to_numpy()], names=["job", "__ntuple", "entry", "nu"]))
     pre = fv(s.vtx_x, s.vtx_y, s.vtx_z) & s.is_not_clear_cosmic.fillna(False).astype(bool).to_numpy() & (s.nu_score > 0.45).to_numpy()
     out["pre"] = pre; out["two"] = pre & (s.n_good == 2).to_numpy()
-    for c in ("vtx_x", "vtx_y", "vtx_z"): out[c] = s[c].to_numpy()
+    for c in ("vtx_x", "vtx_y", "vtx_z", "n_good"): out[c] = s[c].to_numpy()
+    for c in ("n_pfp", "n_prong", "n_trk", "n_proton", "n_shower"):   # slice-level topology counts (M2's topology class in the surrogate)
+        if c in s.columns: out[c] = s[c].to_numpy()
     for c in s.columns:
         if c.startswith("t1_") or c.startswith("t2_"): out[c] = s[c].to_numpy()
     out["c_vtx"] = fv(s.vtx_x, s.vtx_y, s.vtx_z)
