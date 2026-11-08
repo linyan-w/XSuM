@@ -126,7 +126,7 @@ def cohpi_counts(X, valid):
     return {"n_prong": near.sum(1), "n_trk": trk.sum(1), "n_proton": (trk & (g("chi2_mu_new") > 25)).sum(1), "n_shower": (near50 & (g("trackScore") < 0.5)).sum(1)}
 
 
-def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_slices=3_000_000, d_model=192, n_layers=4, bs=1024, lr=5e-4,
+def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=40, seed=0, max_slices=3_000_000, d_model=256, n_layers=4, bs=1024, lr=5e-4,
         primsets_dir=None, n_part_layers=2, geo=False):
     """primsets_dir: true particle tokens (xsum.prep.primset, mmap layout) for PFP-to-particle cross-attention; None = off."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True); t0 = time.time()

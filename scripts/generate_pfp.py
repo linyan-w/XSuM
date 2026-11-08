@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Generate PFP tables for a generated slice file (output of generate_slc.py) with a trained M4 model.
 
-usage: python scripts/generate_pfp.py reports/m4_official_v2 <table dir> <generated slc parquet> <out parquet> [--max-rows N] [--primsets DIR]
+usage: python scripts/generate_pfp.py reports/m4_official_m3w0 <table dir> <generated slc parquet> <out parquet> [--max-rows N] [--primsets DIR]
 The table dir provides the features of the generating neutrinos (features.parquet); rows are matched by neutrino index.
 """
 import argparse
