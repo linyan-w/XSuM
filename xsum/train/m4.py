@@ -101,6 +101,22 @@ def end_point_metrics(Xr, vr, Xg, vg, cls=None):
     return out
 
 
+def cc1p_selection(X, valid, vtx):
+    """The CC1p0pi 2prong and 2prong-contained cuts on a raw PFP-set array with the slice vertex vtx [n,3]:
+    exactly two tracks with length > 0 within 100 cm of the vertex; vertex, both starts and both ends in the FV and on
+    one side of the cathode (10 cm margin) -> (two [n], contained [n])."""
+    g = lambda n: X[..., NAMES.index(n)]
+    L = np.nan_to_num(track_len(X), nan=-1.0)
+    good = (g("has_trk") > 0.5) & valid & (g("dist_to_vertex") < 100) & (L > 0)
+    fv = lambda x, y, z: (np.abs(x) < 190) & (np.abs(y) < 190) & (z > 10) & (z < 450)
+    two = (good.sum(1) == 2) & fv(*vtx.T)
+    Ls = np.where(good, L, -1.0); o = np.argsort(-Ls, 1)[:, :2]; r = np.arange(len(X))[:, None]
+    st = np.stack([g(f"start_{a}")[r, o] for a in "xyz"], -1); en = st + np.stack([g(f"disp_{a}")[r, o] for a in "xyz"], -1)
+    P = np.concatenate([vtx[:, None], st, en], 1)                      # [n, 5, 3]
+    ok = fv(P[..., 0], P[..., 1], P[..., 2]).all(1) & ((P[..., 0] < -10).all(1) | (P[..., 0] > 10).all(1))
+    return two, two & ok
+
+
 def cohpi_counts(X, valid):
     """n_prong, n_trk, n_proton, n_shower from a raw PFP-set array (cohpi definitions on PFPs within 50 cm)."""
     g = lambda n: X[..., NAMES.index(n)]
@@ -211,6 +227,16 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
           f">10 cm {ep['err_end']['frac_gt10']:.2f}; lateral real {ep['lateral_real']['median']:.1f} gen {ep['lateral_gen']['median']:.1f}; "
           f"end in FV real {ep['end_in_fv_real']:.4f} gen {ep['end_in_fv_gen']:.4f} (straight line {ep['line_end_in_fv_gen']:.4f}); "
           f"wall distance <-3/+-3/3-10/10-20/>20: real {np.round(ep['wall_hist_real'], 3).tolist()} gen {np.round(ep['wall_hist_gen'], 3).tolist()} line {np.round(ep['wall_hist_line_gen'], 3).tolist()}", flush=True)
+    vtx = T.iloc[ite][["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64)
+    (tw_r, ct_r), (tw_g, ct_g) = cc1p_selection(Xr, vr, vtx), cc1p_selection(Xg, pm, vtx); cl = tcls[ite]; sel = {}
+    for k, name in enumerate(TRUTH_CLASSES):
+        m = cl == k
+        sel[name] = {"two_real": float(tw_r[m].mean()), "two_gen": float(tw_g[m].mean()),
+                     "cont_given_two_real": float(ct_r[m].sum() / max(tw_r[m].sum(), 1)), "cont_given_two_gen": float(ct_g[m].sum() / max(tw_g[m].sum(), 1)),
+                     "cont_given_two_both": [float(ct_r[m & tw_r & tw_g].mean()), float(ct_g[m & tw_r & tw_g].mean())]}
+        b = sel[name]; print(f"  {name:13s} 2prong real {b['two_real']:.4f} gen {b['two_gen']:.4f}; contained/2prong real {b['cont_given_two_real']:.3f} gen {b['cont_given_two_gen']:.3f}"
+                             f" (2prong in both: {b['cont_given_two_both'][0]:.3f} / {b['cont_given_two_both'][1]:.3f})", flush=True)
+    metrics["cc1p_selection_by_class"] = sel
     for name, b in ep.get("by_class", {}).items():
         print(f"  {name:13s} n={b['n']:6d} end in FV real {b['end_in_fv_real']:.4f} gen {b['end_in_fv_gen']:.4f}; on wall real {b['on_wall_real']:.4f} gen {b['on_wall_gen']:.4f}", flush=True)
     cr, cg = cohpi_counts(Xr, vr), cohpi_counts(Xg, pm)
