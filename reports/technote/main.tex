@@ -403,7 +403,8 @@ of its ends outside the TPC), and when the real longest track ends on the wall t
 M3 & 3,852 & 0.199 / 0.397 & 0.543 / 0.339 & 0.106 / 0.861 \\
 M3w (Geant4 inputs, diagnostic) & 3,698 & 0.190 / 0.395 & 0.569 / 0.370 & 0.104 / 0.876 \\
 M3w0 (shipped) & 3,725 & 0.191 / 0.394 & 0.531 / 0.343 & 0.106 / 0.872 \\
-hybrid: \real{} slices $+$ M3w0 PFPs & 3,500 & 0.194 / 0.426 & 0.559 / 0.384 & 0.112 / 0.880 \\\bottomrule
+hybrid: \real{} slices $+$ M3w0 PFPs & 3,500 & 0.194 / 0.426 & 0.559 / 0.384 & 0.112 / 0.880 \\
+M2w: M2 with wall targets $+$ M3w0 & 3,639 & 0.185 / 0.390 & 0.515 / 0.341 & 0.106 / 0.870 \\\bottomrule
 \end{tabular}
 \caption{CC1p0pi at ``2prong-contained'' (selected, efficiency and purity under both signal definitions) and at
 the end of the selection (2prong-mup-PID), test files of jobs 0--199.}\label{tab:ends_accept}\end{table}
@@ -425,16 +426,27 @@ probability is higher in every bin, and the bin populations explain at most 100 
 background events. The slice block misses the same geometry M4 missed (Table~\ref{tab:m2wall}): an exiting longest
 track has a length equal to the path from the vertex to the wall along its direction, and an exiting cohpi muon
 ends on the wall. M2's flow smears both, and M4 then builds tracks of the generated length that stop inside.
-The fix is the M4 treatment applied to M2 (a wall flag and offset for the slice-block end points, and for the
-longest-track length relative to the path to the wall); it needs an M2 retraining.
+\paragraph{M2 with wall targets (M2w).} The M4 treatment was applied to M2. A flag and an offset are added for the
+longest-track length against the path to the wall (flag when $|L/\ell_\mathrm{wall}-1|<0.03$). The cohpi muon and
+pion-candidate end points get a per-axis flag and an outward offset on the wall planes. The flags are dequantised
+in the flow and snapped after generation; M4 is unchanged (M3w0). The slice-block wall marginals now agree with
+\real{} (Table~\ref{tab:m2wall}), but the acceptance does not move (Table~\ref{tab:ends_accept}): purity 0.390
+against 0.394 for M3w0. The excess of contained background drops only from 370 to 324 events, and the final-stage
+numbers are unchanged. Per event the flag is only half right: of the test slices whose \real{} longest track
+reaches the wall, the generated one does in 56\%, and it does in 10\% of those whose \real{} track stops inside.
+The marginal is reproduced by putting exits on the wrong events. Whether a given event's track exits is fixed in
+\real{} by where the particle actually goes, and M2 has to infer it from generator truth through the M3 encoding.
+The hybrid has this per-event information, the generated chain does not; that, not the wall marginal, is the
+three quarters of the gap that comes through the slice block. M2w also puts 4.2\% of cohpi muon ends outside the
+TPC (\real{} 0.06\%) because unflagged ends are not clipped.
 
 \begin{table}[h]\centering\small
-\begin{tabular}{lcc}\toprule
-all matched slices, jobs 0--199 & \real{} & M2 \\\midrule
-longest track: length / path to the wall within $\pm2\%$ & 0.145 & 0.060 \\
-\quad length / path $>1.05$ & 0.076 & 0.133 \\
-cohpi muon end on the wall ($\pm3$\,cm) & 0.429 & 0.079 \\
-cohpi muon end outside the TPC ($<-3$\,cm) & 0.001 & 0.187 \\\bottomrule
+\begin{tabular}{lccc}\toprule
+all matched slices, jobs 0--199 & \real{} & M2 & M2w \\\midrule
+longest track: length / path to the wall within $\pm2\%$ & 0.145 & 0.060 & 0.163 \\
+\quad length / path $>1.05$ & 0.076 & 0.133 & 0.091 \\
+cohpi muon end on the wall ($\pm3$\,cm) & 0.429 & 0.079 & 0.434 \\
+cohpi muon end outside the TPC ($<-3$\,cm) & 0.001 & 0.187 & 0.043 \\\bottomrule
 \end{tabular}
 \caption{Wall consistency of the slice block (\texttt{scripts/diag\_m2\_purity.py}).}\label{tab:m2wall}\end{table}
 \FloatBarrier
@@ -493,9 +505,10 @@ after review.
 Done so far: the official sample, M1 baselines, M2 (slice block), M3 (particle-set encoder, stage A), M4 (PFP set, generated track ends on the wall),
 and production-format surrogated datasets for the analysers. Remaining:
 \begin{enumerate}
-\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): give M2 the wall treatment of M4 (wall flag and
-      offset for the slice-block end points, longest-track length against the path to the wall), retrain M2,
-      regenerate and rerun the acceptance; then the remaining 0.01 in M4.
+\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}). The M2 wall treatment is done (M2w) and fixes the
+      wall marginals but not the purity: the per-event exit decision is wrong in half of the exiting slices. Next
+      is a generator-truth exit predictor as an M2/M4 input (true vertex, direction and CSDA range of the
+      true muon and pions against the path to the wall, no Geant4), then the remaining 0.01 in M4.
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} to 0.2\% (median, 90\% quantile 0.8\%) on \real{} slices,

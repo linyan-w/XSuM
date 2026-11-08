@@ -90,3 +90,22 @@ slightly fewer contained background than real; the hybrid recovers purity 0.426:
 M2 slice block. `m2_purity_m3w0.txt`: containment probability high in every bin of every slice variable; the slice
 block misses the wall (longest-track length = path to wall 6.0% vs real 14.5%; cohpi muon end on the wall 7.9% vs
 42.9%, outside the TPC 18.7% vs 0.1%). Next: wall treatment for M2.
+
+## M2 with wall targets (M2w), 2026-11-08
+
+M2 retrained with the wall targets (longest-track length vs path to wall, flag + offset; cohpi muon / cpi end per-axis
+wall flag + offset), regenerated slices, PFPs from the shipped M3w0 (`accept_m2w.txt`, `diag_m2w_summary.txt`,
+`m2_purity_m2w.txt`; dataset `surrogate_official_m2w_pfp`, jobs 0-199).
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| hybrid | 3,500 | 0.194 / 0.426 | 0.559 / 0.384 | 0.112 / 0.880 |
+| M2w | 3,639 | 0.185 / 0.390 | 0.515 / 0.341 | 0.106 / 0.870 |
+
+Wall marginals now match (length = path to wall 0.163 vs real 0.146; muon end on wall 0.434 vs 0.429) but muon end
+outside the TPC 4.2% (real 0.06%, unflagged ends not clipped). Purity unchanged; contained-background excess 370 -> 324.
+Per event (M2 test slices): P(gen long track at wall | real at wall) = 0.56, P(gen at wall | real not) = 0.10. The
+marginal is right, the event assignment is not: the hybrid carries the per-event exit from the real detector, the
+generated chain must infer it from generator truth. Next: a generator-truth exit predictor (CSDA range vs path to wall).
