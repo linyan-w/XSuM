@@ -1,0 +1,54 @@
+sets 3000001, table 5736854, aligned 3000001  (22 s)
+cond dim 309, train 2399818 val 299690 test 300492  (63 s)
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/cuda/__init__.py:829: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+n_fit {'logloss': 0.1732, 'logloss_marginal': 1.5522, 'accuracy': 0.9325}
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/cuda/__init__.py:829: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+n_empty {'logloss': 0.1177, 'logloss_marginal': 0.1931, 'accuracy': 0.957}
+/home/lwan/SBND/XSuM/xsum/data/pfpset_tf.py:28: RuntimeWarning: invalid value encountered in cast
+  x = np.asarray(x, dtype=np.float64)
+epoch   0 train 0.9630 val 0.8459
+epoch   1 train 0.8184 val 0.8002
+epoch   2 train 0.7899 val 0.7816
+epoch   3 train 0.7753 val 0.7707
+epoch   4 train 0.7660 val 0.7608
+epoch   5 train 0.7576 val 0.7529
+epoch   6 train 0.7510 val 0.7484
+epoch   7 train 0.7451 val 0.7430
+epoch   8 train 0.7406 val 0.7417
+epoch   9 train 0.7368 val 0.7374
+epoch  10 train 0.7340 val 0.7346
+epoch  11 train 0.7297 val 0.7302
+epoch  12 train 0.7287 val 0.7261
+epoch  13 train 0.7252 val 0.7272
+epoch  14 train 0.7231 val 0.7245
+epoch  15 train 0.7207 val 0.7179
+epoch  16 train 0.7192 val 0.7210
+epoch  17 train 0.7173 val 0.7181
+epoch  18 train 0.7149 val 0.7155
+epoch  19 train 0.7142 val 0.7163
+epoch  20 train 0.7119 val 0.7137
+epoch  21 train 0.7101 val 0.7113
+epoch  22 train 0.7089 val 0.7098
+epoch  23 train 0.7074 val 0.7071
+epoch  24 train 0.7064 val 0.7068
+epoch  25 train 0.7042 val 0.7033
+epoch  26 train 0.7033 val 0.7038
+epoch  27 train 0.7027 val 0.7035
+epoch  28 train 0.7009 val 0.7015
+epoch  29 train 0.7006 val 0.6997
+epoch  30 train 0.6993 val 0.6991
+epoch  31 train 0.6982 val 0.6974
+epoch  32 train 0.6983 val 0.6963
+epoch  33 train 0.6965 val 0.6950
+epoch  34 train 0.6963 val 0.6977
+epoch  35 train 0.6955 val 0.6961
+epoch  36 train 0.6951 val 0.6942
+epoch  37 train 0.6952 val 0.6957
+epoch  38 train 0.6938 val 0.6948
+epoch  39 train 0.6944 val 0.6944
+end point (longest track, same test slices): |gen-real| median 11.6 cm (straight line 10.0), >10 cm 0.54; lateral real 7.9 gen 7.8; end in FV real 0.4970 gen 0.4860 (straight line 0.4858); wall distance <-3/+-3/3-10/10-20/>20: real [0.002, 0.349, 0.087, 0.075, 0.487] gen [0.022, 0.363, 0.07, 0.067, 0.478] line [0.097, 0.241, 0.108, 0.082, 0.472]
+n_fit real/gen mean: 2.342 2.342  two-track rate real/gen/slc: 0.0797 0.0807 0.0797
+W1: {'dist_to_vertex': 0.017, 'trackScore': 0.002, 'start_x': 0.523, 'start_y': 0.525, 'start_z': 0.711, 'dir_x': 0.002, 'dir_y': 0.002, 'dir_z': 0.002, 'len_excess': 0.007, 'rangeP_mu': 0.002, 'mcsP_mu': 0.016, 'chi2_mu': 0.006, 'chi2_pro': 0.003, 'chi2_mu_new': 0.006, 'chi2_pro_new': 0.004, 'chi2_kaon': 0.006, 'chi2_pion': 0.006, 'pida': 0.007, 'chi2_ndof': 0.023, 'shw_energy': 0.004, 'shw_len': 0.005, 'shw_open_angle': 0.004, 'shw_density': 0.004, 'shw_conversion_gap': 0.017, 'shw_dEdx': 0.015, 'disp_x': 0.003, 'disp_y': 0.005, 'disp_z': 0.011, 'wall_off_x': 0.011, 'wall_off_y': 0.142, 'wall_off_z': 0.014}
+done in 2713 s -> reports/m4_official_m3w0

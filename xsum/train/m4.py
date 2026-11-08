@@ -59,7 +59,20 @@ def longest_track_end(X, valid):
     return nan(st + dsp), nan(st + Lk * dr), nan(st)
 
 
-def end_point_metrics(Xr, vr, Xg, vg):
+TRUTH_CLASSES = ("CC Npi", "CC 0pi 1p", "CC 0pi other", "NC")
+
+
+def truth_class(F, cols):
+    """Generator-truth class per slice from the M3 feature table (n_mu, n_pi, n_p, n_e counts): CC Npi, CC 0pi 1p,
+    CC 0pi other, NC (no lepton); -1 = other (nue CC)."""
+    g = lambda n: F[:, cols.index(n)]
+    mu, pi, pr, e = g("n_mu") > 0, g("n_pi") > 0, g("n_p") == 1, g("n_e") > 0
+    c = np.full(len(F), -1, np.int8)
+    c[mu & pi] = 0; c[mu & ~pi & pr] = 1; c[mu & ~pi & ~pr] = 2; c[~mu & ~e] = 3
+    return c
+
+
+def end_point_metrics(Xr, vr, Xg, vg, cls=None):
     """Same test slices, real vs generated longest track: per-event end-point error (generated end point and the
     straight-line end start + len * dir), distribution-level FV containment of the end, lateral deviation from the
     straight line."""
@@ -78,6 +91,13 @@ def end_point_metrics(Xr, vr, Xg, vg):
     bins = [-1e9, -3, 3, 10, 20, 1e9]; h = lambda e: (np.histogram(wall(e[np.isfinite(e[:, 0])]), bins)[0] / max(np.isfinite(e[:, 0]).sum(), 1)).tolist()
     out["wall_hist_bins"] = ["<-3", "-3..3", "3..10", "10..20", ">20"]
     out["wall_hist_real"], out["wall_hist_gen"], out["wall_hist_line_gen"] = h(er), h(eg), h(eg_line)
+    if cls is not None:   # the same per generator-truth class: does the end distribution follow the event, not only the average?
+        out["by_class"] = {}
+        for k, name in enumerate(TRUTH_CLASSES):
+            m = cls == k; fr, fg = m & np.isfinite(er[:, 0]), m & np.isfinite(eg[:, 0])
+            if fr.sum() < 100: continue
+            out["by_class"][name] = {"n": int(m.sum()), "end_in_fv_real": float(fv(er[fr]).mean()), "end_in_fv_gen": float(fv(eg[fg]).mean()),
+                                     "on_wall_real": float((np.abs(wall(er[fr])) < 3).mean()), "on_wall_gen": float((np.abs(wall(eg[fg])) < 3).mean())}
     return out
 
 
@@ -109,7 +129,8 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
         for i in range(0, len(sel), 200_000): c = sel[i:i + 200_000]; X[i:i + len(c)] = X[c]
         X = X[:len(sel)]
     n_fit = np.clip(S["n_fit"][sel], 0, N_MAX).astype(int); n_empty = np.clip(S["n_empty"][sel], 0, N_EMPTY_MAX).astype(int); tpdg = S["truth_pdg"][sel]
-    T = T.iloc[pos[sel]]; Fi = F.index[pos[sel]]; F = F.to_numpy(np.float32)[pos[sel]]; del S
+    T = T.iloc[pos[sel]]; Fi = F.index[pos[sel]]; fcols = list(F.columns); F = F.to_numpy(np.float32)[pos[sel]]; del S
+    tcls = truth_class(F, fcols)
     if primsets_dir:   # keys now; the particle arrays themselves are loaded after the conditioning (memory peak)
         from .m3 import pack
         g = lambda n: Fi.get_level_values(n).to_numpy()
@@ -184,12 +205,14 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
             rr, ff = fwd(r, tf), fwd(f, tf); rr, ff = rr[np.isfinite(rr)], ff[np.isfinite(ff)]
             percol[name] = sample_vs_real_1d(rr, ff) if len(rr) > 10 and len(ff) > 10 else {"w1": float("nan")}
     metrics["per_field"] = percol
-    metrics["end_point"] = end_point_metrics(Xr, vr, Xg, pm)
+    metrics["end_point"] = end_point_metrics(Xr, vr, Xg, pm, tcls[ite])
     ep = metrics["end_point"]
     print(f"end point (longest track, same test slices): |gen-real| median {ep['err_end']['median']:.1f} cm (straight line {ep['err_line_end']['median']:.1f}), "
           f">10 cm {ep['err_end']['frac_gt10']:.2f}; lateral real {ep['lateral_real']['median']:.1f} gen {ep['lateral_gen']['median']:.1f}; "
           f"end in FV real {ep['end_in_fv_real']:.4f} gen {ep['end_in_fv_gen']:.4f} (straight line {ep['line_end_in_fv_gen']:.4f}); "
           f"wall distance <-3/+-3/3-10/10-20/>20: real {np.round(ep['wall_hist_real'], 3).tolist()} gen {np.round(ep['wall_hist_gen'], 3).tolist()} line {np.round(ep['wall_hist_line_gen'], 3).tolist()}", flush=True)
+    for name, b in ep.get("by_class", {}).items():
+        print(f"  {name:13s} n={b['n']:6d} end in FV real {b['end_in_fv_real']:.4f} gen {b['end_in_fv_gen']:.4f}; on wall real {b['on_wall_real']:.4f} gen {b['on_wall_gen']:.4f}", flush=True)
     cr, cg = cohpi_counts(Xr, vr), cohpi_counts(Xg, pm)
     two_r = (cr["n_prong"] == 2) & (cr["n_trk"] == 2) & (cr["n_proton"] == 0) & (cr["n_shower"] == 0)
     two_g = (cg["n_prong"] == 2) & (cg["n_trk"] == 2) & (cg["n_proton"] == 0) & (cg["n_shower"] == 0)
