@@ -1,0 +1,14 @@
+events: 24553;  real P(n_pfp=3 | end in FV / outside) 0.108 / 0.135
+head on real block                 0.107 / 0.135  link +0.0284
+head on generated block            0.108 / 0.112  link +0.0037
+
+(event split fixed by the unswapped block)
+real block, one group replaced by generated  |  generated block, one group replaced by real
+  vertex             0.107 / 0.135  link +0.0277   |   0.108 / 0.112  link +0.0037
+  scores+pe          0.109 / 0.137  link +0.0280   |   0.110 / 0.113  link +0.0030
+  long dir           0.106 / 0.130  link +0.0244   |   0.108 / 0.110  link +0.0027
+  long length+wall   0.107 / 0.133  link +0.0255   |   0.109 / 0.109  link -0.0003
+  long pid/chi2      0.107 / 0.136  link +0.0294   |   0.109 / 0.112  link +0.0037
+  short group        0.108 / 0.124  link +0.0159   |   0.110 / 0.110  link +0.0004
+  two group          0.103 / 0.128  link +0.0246   |   0.107 / 0.110  link +0.0031
+  charge spheres     0.110 / 0.140  link +0.0305   |   0.109 / 0.115  link +0.0059

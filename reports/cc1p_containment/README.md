@@ -138,3 +138,13 @@ vs 759), i.e. a topology shift, partly an over-correction. Topology head with th
 Inclusive P(longest track at wall | n_pfp) is reproduced by both M2w and M2t; the CC Npi-specific link is not.
 Side effects: cohpi 2-track tuple rate 0.0779 vs 0.0811, n_trk>=2 without short track 0.8% (real 0), pion range on
 the curve 72% (real 93%).
+
+## Swap test on the M2t topology head (`scripts/diag_m2_swap.py`, `swap_m2t.txt`), 2026-11-08
+
+Truth CC + charged pion slices of the M2 test split (vertex in FV, nu_score > 0.45; 24.6k): P(n_pfp=3 | longest end in
+FV / outside) real 0.108 / 0.135 (link +0.028); head on the real block +0.028, on the generated block +0.004. Replacing
+one group of the real block by the generated one (event split fixed): short group +0.016 (presence alone +0.018, values
+alone +0.027), two group +0.025, long dir +0.024, long length +0.026, others ~0.028. No single group restores the link
+in the generated block. The link is carried jointly, the largest single piece by whether a short track exists, which
+M2t samples from truth alone, independent of the flow's longest track. Next: one joint model for the counts, the
+group presence and the always-present variables (stage 1), optional groups conditioned on it (stage 2).
