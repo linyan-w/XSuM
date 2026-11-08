@@ -8,43 +8,44 @@
     .h{font-weight:bold;font-size:14px}.s{font-size:11.5px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}
   </style>
 
-  <text x="20" y="28" class="h" font-size="17">XSuM as built (M3 v2 inputs, 2026-11-06): inputs, models, generated tables</text>
+  <text x="20" y="28" class="h" font-size="17">XSuM as built (surrogate_official_m3w0_pfp, 2026-11-08): inputs, models, generated tables</text>
   <text x="20" y="48" class="cap">one true neutrino interaction in, its reconstructed record out; tables are the XSuM cafpyana dataframes (mcnu, mcprim, mcdaught, slc, pfp)</text>
 
   <!-- INPUTS -->
-  <text x="20" y="84" class="h">INPUTS  (raw truth only)</text>
+  <text x="20" y="84" class="h">INPUTS  (detector-causal truth)</text>
   <rect x="20" y="94" width="290" height="150" class="box in"/>
   <text x="32" y="114" class="h">Final-state particle set   [mcprim]</text>
   <text x="32" y="134" class="s">all post-FSI primaries, up to 32 tokens by KE</text>
   <text x="32" y="150" class="s">(0.45% of neutrinos lose their softest ones)</text>
   <text x="32" y="166" class="s">token: class (mu, e, p, n, pi+-, pi0, gamma, K+-,</text>
-  <text x="32" y="182" class="s">   K0, Lambda, Sigma, other) + (px, py, pz)</text>
-  <text x="32" y="198" class="s">   with a fixed asinh(p / 0.1 GeV) scaling</text>
-  <text x="32" y="214" class="s">energy, angles: left for the network to derive</text>
+  <text x="32" y="182" class="s">   K0, Lambda, Sigma, other), px, py, pz, KE</text>
+  <text x="32" y="198" class="s">+ path lengths from the vertex along its direction</text>
+  <text x="32" y="214" class="s">   to the cathode, x/y wall, z wall</text>
   <text x="32" y="232" class="s">dropped: neutrinos, nuclei, Bertini pseudo-particle</text>
 
-  <rect x="20" y="256" width="290" height="70" class="box in"/>
-  <text x="32" y="276" class="h">True vertex   [mcnu]</text>
-  <text x="32" y="296" class="s">(x, y, z) / 250 cm, the only neutrino-level input;</text>
-  <text x="32" y="312" class="s">distances to cathode and walls: left to the network</text>
+  <rect x="20" y="256" width="290" height="104" class="box in"/>
+  <text x="32" y="276" class="h">80 summary features   [mcnu, mcprim]</text>
+  <text x="32" y="296" class="s">true vertex; distances to cathode and walls;</text>
+  <text x="32" y="312" class="s">per species: multiplicity, summed / max KE, leading</text>
+  <text x="32" y="328" class="s">   p, cos(theta), pT; totals (charged mult., visible E,</text>
+  <text x="32" y="344" class="s">   EM energy, longitudinal momentum)</text>
 
-  <rect x="20" y="338" width="290" height="100" class="box no"/>
-  <text x="32" y="358" class="h" fill="#777">Truth not used as input</text>
-  <text x="32" y="378" class="s">all other mcnu columns (E_nu, CC/NC, mode, W, Q2,</text>
-  <text x="32" y="394" class="s">   signal flags): labels for checks only</text>
-  <text x="32" y="410" class="s">mcdaught (Geant4 daughters): copied, not an input</text>
-  <text x="32" y="426" class="s">no hand-made summary features</text>
+  <rect x="20" y="372" width="290" height="82" class="box no"/>
+  <text x="32" y="392" class="h" fill="#777">Truth not used as input</text>
+  <text x="32" y="410" class="s">no Geant4 quantity (end points, lengths, mcdaught):</text>
+  <text x="32" y="426" class="s">   copied or used as diagnostic reference only</text>
+  <text x="32" y="442" class="s">mode, CC/NC, W, Q2, E_nu, signal flags: labels only</text>
 
   <!-- MODELS -->
   <text x="350" y="84" class="h">MODELS  (trained on the training files only)</text>
   <rect x="350" y="94" width="390" height="84" class="box model"/>
   <text x="362" y="114" class="h">M3 particle-set encoder  (stage A, then frozen)</text>
   <text x="362" y="132" class="s">transformer, 4 layers, d = 128, over particle tokens + a context</text>
-  <text x="362" y="148" class="s">token (vertex) -> 64-d embedding z; trained on topology,</text>
+  <text x="362" y="148" class="s">token (80 summary features) -> 64-d embedding z; trained on topology,</text>
   <text x="362" y="164" class="s">presence / containment flags and the slice block (3 M slices)</text>
 
   <rect x="350" y="190" width="390" height="134" class="box model"/>
-  <text x="362" y="210" class="h">M2 Tier 0: what exists   (input: vertex + z)</text>
+  <text x="362" y="210" class="h">M2 Tier 0: what exists   (input: 80 features + z)</text>
   <text x="362" y="228" class="s">matched slices per neutrino 0 / 1 / 2+: GBDT</text>
   <text x="362" y="244" class="s">topology: softmax MLP over 121 classes of</text>
   <text x="362" y="260" class="s">   (n_pfp, n_prong, n_trk, n_proton, n_shower), sampled first</text>
@@ -55,14 +56,14 @@
   <rect x="350" y="336" width="390" height="68" class="box model"/>
   <text x="362" y="356" class="h">M2 Tier 1: slice block  (~50 numbers)</text>
   <text x="362" y="374" class="s">conditional flow matching, MLP 6 x 1024, masked per event to</text>
-  <text x="362" y="390" class="s">the groups that exist; conditioned on vertex, z, topology</text>
+  <text x="362" y="390" class="s">the groups that exist; conditioned on features, z, topology</text>
 
   <rect x="350" y="416" width="390" height="100" class="box model"/>
   <text x="362" y="436" class="h">M4 Tier 2: PFP set of each slice</text>
-  <text x="362" y="454" class="s">softmax heads: number of fitted / unfitted PFPs</text>
-  <text x="362" y="470" class="s">masked set flow (transformer, d = 256, 4 layers) over up to</text>
-  <text x="362" y="486" class="s">   12 PFP tokens x 29 fields; conditioned on vertex, z,</text>
-  <text x="362" y="502" class="s">   topology and the generated slice block</text>
+  <text x="362" y="454" class="s">softmax heads: number of fitted / unfitted PFPs; masked set flow</text>
+  <text x="362" y="470" class="s">   (transformer, d = 256, 4 layers, no particle attention) over up to</text>
+  <text x="362" y="486" class="s">   12 PFP tokens x 38 fields, incl. end displacement and per-axis</text>
+  <text x="362" y="502" class="s">   wall flag + offset; conditioned on features, z, topology, slice block</text>
 
   <!-- OUTPUTS -->
   <text x="780" y="84" class="h">SURROGATED DATAFRAMES  (production format)</text>
@@ -78,10 +79,10 @@
   <rect x="780" y="236" width="380" height="114" class="box out"/>
   <text x="792" y="256" class="h">pfp_0: generated   (M4)</text>
   <text x="792" y="276" class="s">fitted PFPs only: trackScore, dist_to_vertex, primary flag,</text>
-  <text x="792" y="292" class="s">track start, direction, length, range / MCS p_mu,</text>
+  <text x="792" y="292" class="s">track start, direction, end, length, range / MCS p_mu,</text>
   <text x="792" y="308" class="s">chi2 mu, p (2 calibrations), K, pi, PIDA (collection plane),</text>
   <text x="792" y="324" class="s">shower energy, length, angle, density, gap, dE/dx, start</text>
-  <text x="792" y="340" class="s">track end = start + length x direction (not generated)</text>
+  <text x="792" y="340" class="s">track end generated; wall-flagged ends snapped onto the TPC wall</text>
 
   <rect x="780" y="362" width="380" height="52" class="box copy"/>
   <text x="792" y="382" class="h">copied from the production</text>
@@ -109,8 +110,8 @@
   <text x="32" y="556" class="h">Validation done (held-out test files)</text>
   <text x="32" y="576" class="s">per-column / per-field marginals (W1), group presence and containment heads, cohpi cut flow (all and true-signal),</text>
   <text x="32" y="592" class="s">correlation matrices and joint densities, per-event real-vs-generated correlations on the same neutrinos,</text>
-  <text x="32" y="608" class="s">CC1p0pi acceptance test (collaborator's cut flow, jobs 0-199): efficiency, purity and event overlap per stage</text>
-  <text x="32" y="630" class="s">not done yet: physics holdouts, uncertainty estimates, end-to-end encoder, PFP-to-particle attention</text>
+  <text x="32" y="608" class="s">CC1p0pi acceptance (two signal definitions, jobs 0-199), containment diagnostic, track-end floor, hybrid real-slice test</text>
+  <text x="32" y="630" class="s">not done yet: physics holdouts, uncertainty estimates; M2 wall treatment (source of the CC1p0pi purity gap)</text>
 
   <rect x="780" y="536" width="380" height="110" class="box down"/>
   <text x="792" y="556" class="h">Downstream (collaborators)</text>
@@ -125,6 +126,6 @@
   <text x="32" y="704" class="s">SBND 2026 gen2 BNB + cosmics CV, v10_14_02_03: official SAM definition, 749,262 flat CAFs, 9.94 M events, processed as 2,000 grid jobs</text>
   <text x="32" y="720" class="s">by a selection-free cafpyana configuration: 17.9 M true neutrinos, 5.74 M truth-matched slices. Split 80 / 10 / 10 by input file (never by row).</text>
   <text x="32" y="736" class="s">M2 and M4 trained on 3 M sampled training slices each (RTX 3090). Generated for all neutrinos: 5.92 M slices, 14.06 M PFPs.</text>
-  <text x="32" y="756" class="s">Dataset: /pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_official_m3_pfp/ (2,000 files, 60 GB; file_splits.parquet marks the test files).</text>
-  <text x="32" y="772" class="s">Status 2026-11-06: models with these inputs (M3 v2) in training; the shipped surrogate_official_m3_pfp used M3 v1 (80 summary features + derived distances).</text>
+  <text x="32" y="756" class="s">Datasets: /pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_official_m3w0_pfp/ (jobs 0-199 so far), surrogate_official_m3_pfp/ (2,000 files, previous M4).</text>
+  <text x="32" y="772" class="s">Status 2026-11-08: M3 v1 inputs; M4 = M3w0 (generated track ends, wall flag, no attention, generator truth only); M2 unchanged since M3.</text>
 </svg>

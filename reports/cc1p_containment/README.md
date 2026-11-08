@@ -72,3 +72,21 @@ containment (`accept2_*.txt`, 7,686 signal neutrinos); the notebook's definition
 | M3 | 942 | 0.106 / 0.861 | 0.305 / 0.780 |
 | M3g | 971 | 0.111 / 0.877 | 0.329 / 0.816 |
 | M3w | 910 | 0.104 / 0.876 | 0.316 / 0.836 |
+
+## Shipped M4 (M3w0) and the origin of the purity gap, 2026-11-08
+
+M3w0 = layout v4 (generated end displacement + wall flag/offset), no particle attention, generator truth only
+(`accept_m3w0.txt`, `diag_m3w0_summary.txt`). Hybrid = real slice table + M3w0 PFPs (`accept_hyb.txt`).
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| hybrid | 3,500 | 0.194 / 0.426 | 0.559 / 0.384 | 0.112 / 0.880 |
+
+M3w0 reproduces the wall pile-up per background category (`wall_by_cat.txt`; CC Npi on wall 0.36 vs 0.43, M3 0.09)
+and the per-event exit (0.90), but purity stays at 0.394. The M4 closure with the CC1p0pi cuts per truth class gives
+slightly fewer contained background than real; the hybrid recovers purity 0.426: ~3/4 of the gap comes through the
+M2 slice block. `m2_purity_m3w0.txt`: containment probability high in every bin of every slice variable; the slice
+block misses the wall (longest-track length = path to wall 6.0% vs real 14.5%; cohpi muon end on the wall 7.9% vs
+42.9%, outside the TPC 18.7% vs 0.1%). Next: wall treatment for M2.
