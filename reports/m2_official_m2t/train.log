@@ -1,0 +1,78 @@
+cardinality head trained on the card table
+table 3000000 neutrinos, matched 3000000  (213 s)
+restricted to 3000000 matched slices
+[mem] after load: peak RSS 17.4 GB
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/cuda/__init__.py:829: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+topology: {'n_classes': 121, 'frac_other_train': 0.0537, 'topo_last': 1, 'logloss': 1.3595, 'logloss_marginal': 3.3083, 'accuracy': 0.5978}
+[mem] after heads: peak RSS 21.3 GB
+presence: {'short': 0.925, 'two': 0.871, 's1': 0.781, 's2': 0.815, 's3': 0.825, 's4': 0.833, 'is_muon_contained': 0.965, 'is_cpi_contained': 0.937, 'spike_vtx_z': 0.98, 'spike_vtx_x': 0.989, 'spike_vtx_y': 0.979, 'spike_opening_angle': 0.879}
+/home/lwan/SBND/XSuM/.venv/lib64/python3.9/site-packages/torch/cuda/__init__.py:829: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+epoch   0 train 1.4716 val 1.0972
+epoch   1 train 1.0200 val 0.9855
+epoch   2 train 0.9627 val 0.9478
+epoch   3 train 0.9332 val 0.9203
+epoch   4 train 0.9109 val 0.9026
+epoch   5 train 0.8966 val 0.8935
+epoch   6 train 0.8854 val 0.8858
+epoch   7 train 0.8763 val 0.8765
+epoch   8 train 0.8698 val 0.8716
+epoch   9 train 0.8639 val 0.8642
+epoch  10 train 0.8588 val 0.8577
+epoch  11 train 0.8534 val 0.8518
+epoch  12 train 0.8494 val 0.8521
+epoch  13 train 0.8466 val 0.8495
+epoch  14 train 0.8405 val 0.8441
+epoch  15 train 0.8376 val 0.8407
+epoch  16 train 0.8352 val 0.8364
+epoch  17 train 0.8321 val 0.8333
+epoch  18 train 0.8298 val 0.8297
+epoch  19 train 0.8257 val 0.8256
+epoch  20 train 0.8239 val 0.8260
+epoch  21 train 0.8198 val 0.8238
+epoch  22 train 0.8177 val 0.8204
+epoch  23 train 0.8152 val 0.8176
+epoch  24 train 0.8124 val 0.8177
+epoch  25 train 0.8098 val 0.8153
+epoch  26 train 0.8076 val 0.8121
+epoch  27 train 0.8041 val 0.8104
+epoch  28 train 0.8025 val 0.8063
+epoch  29 train 0.8003 val 0.8063
+epoch  30 train 0.7975 val 0.8032
+epoch  31 train 0.7957 val 0.8011
+epoch  32 train 0.7938 val 0.7999
+epoch  33 train 0.7921 val 0.7945
+epoch  34 train 0.7889 val 0.7930
+epoch  35 train 0.7873 val 0.7944
+epoch  36 train 0.7861 val 0.7909
+epoch  37 train 0.7842 val 0.7888
+epoch  38 train 0.7816 val 0.7889
+epoch  39 train 0.7808 val 0.7862
+epoch  40 train 0.7782 val 0.7840
+epoch  41 train 0.7756 val 0.7833
+epoch  42 train 0.7752 val 0.7796
+epoch  43 train 0.7737 val 0.7798
+epoch  44 train 0.7716 val 0.7786
+epoch  45 train 0.7703 val 0.7738
+epoch  46 train 0.7681 val 0.7757
+epoch  47 train 0.7664 val 0.7756
+epoch  48 train 0.7659 val 0.7735
+epoch  49 train 0.7648 val 0.7721
+epoch  50 train 0.7635 val 0.7725
+epoch  51 train 0.7622 val 0.7723
+epoch  52 train 0.7624 val 0.7698
+epoch  53 train 0.7610 val 0.7679
+epoch  54 train 0.7603 val 0.7695
+epoch  55 train 0.7605 val 0.7668
+epoch  56 train 0.7592 val 0.7677
+epoch  57 train 0.7594 val 0.7677
+epoch  58 train 0.7591 val 0.7678
+epoch  59 train 0.7588 val 0.7717
+/home/lwan/SBND/XSuM/xsum/train/m2.py:144: RuntimeWarning: divide by zero encountered in divide
+  r = L[ok] / path_to_wall(d[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64)[ok], d[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64)[ok])
+wall closure: {'real': {'long_len_at_path': 0.14624954519205413, 'long_len_beyond_path': 0.07552315431424976, 'muon_end_on_wall': 0.42745571147374434, 'muon_end_outside': 0.0006349609499015811}, 'gen': {'long_len_at_path': 0.16372816129709974, 'long_len_beyond_path': 0.09305063210935442, 'muon_end_on_wall': 0.4348966664533879, 'muon_end_outside': 0.043636828971783226}}
+cutflow real: {'pe_bcfm': 236892, '2trk': 20116, 'dir': 1118, 'chi2': 671, 'sphere': 368, 'cathode': 300, 'sr': 156}
+cutflow gen:  {'pe_bcfm': 238389, '2trk': 19247, 'dir': 1090, 'chi2': 679, 'sphere': 375, 'cathode': 317, 'sr': 163}
+W1 (transformed units): {'n_pfp': 0.013, 'n_prong': 0.006, 'n_trk': 0.006, 'n_proton': 0.005, 'n_shower': 0.011, 'vtx_x': 0.356, 'vtx_y': 0.37, 'vtx_z': 1.082, 'nu_score': 0.001, 'bcfm_score': 0.002, 'total_pe': 0.008, 'long_dirx': 0.003, 'long_diry': 0.004, 'long_dirz': 0.007, 'long_trk_len': 0.004, 'long_trk_pid': 0.001, 'long_trk_chi2_mu': 0.01, 'long_trk_chi2_pro': 0.014, 'long_trk_chi2_mu_new': 0.01, 'long_trk_chi2_pro_new': 0.014, 'short_dirx': 0.007, 'short_diry': 0.008, 'short_dirz': 0.018, 'short_trk_len': 0.032, 'short_trk_pid': 0.005, 'short_trk_chi2_mu': 0.025, 'short_trk_chi2_pro': 0.03, 'short_trk_chi2_mu_new': 0.025, 'short_trk_chi2_pro_new': 0.029, 'reco_t': 0.077, 'opening_angle': 0.124, 'range_p_mu': 0.018, 'range_p_cpi': 0.047, 'muon_start_x': 3.576, 'muon_start_y': 2.645, 'muon_start_z': 2.837, 'muon_end_x': 2.576, 'muon_end_y': 3.888, 'muon_end_z': 3.322, 'cpi_start_x': 3.446, 'cpi_start_y': 2.274, 'cpi_start_z': 2.939, 'cpi_end_x': 1.753, 'cpi_end_y': 3.722, 'cpi_end_z': 3.993, 'sum_integ_1cm': 0.014, 'sum_integ_2cm': 0.017, 'sum_integ_3cm': 0.018, 'sum_integ_4cm': 0.021}
+done in 895 s -> reports/m2_official_m2t

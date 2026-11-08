@@ -120,3 +120,21 @@ track end in FV by slice n_pfp (real | M2w | hybrid): n_pfp=3 0.439 | 0.491 | 0.
 5 0.554 | 0.514 | 0.533. Real: few PFPs <-> exiting longest track; M2 generates the exit flat in n_pfp. The hybrid
 (same M4, real slices) closes in every cell -> the missing correlation is between M2's topology class and M2's
 longest-track length, not in M4 and not training statistics (~75k CC Npi 2prong-like training slices).
+
+## M2t: topology sampled after the flow (+ range-curve flags), 2026-11-08
+
+`accept_m2t.txt`, `diag_m2t_summary.txt`, `m2_purity_m2t.txt`, `topo_m2t.txt` (dataset `surrogate_official_m2t_pfp`, jobs 0-199).
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| M2w | 3,639 | 0.185 / 0.390 | 0.515 / 0.341 | 0.106 / 0.870 |
+| M2t | 3,654 | 0.192 / 0.404 | 0.535 / 0.352 | 0.105 / 0.879 |
+
+Purity up by 0.01-0.015, but not through the targeted correlation: CC Npi at slice n_pfp=3 longest end in FV 0.494
+(real 0.439, M2w 0.491). The gain is from fewer background 2prong events (CC other 0pi 2088 vs real 2278, CC Npi 722
+vs 759), i.e. a topology shift, partly an over-correction. Topology head with the block: logloss 1.36 (truth only 2.14).
+Inclusive P(longest track at wall | n_pfp) is reproduced by both M2w and M2t; the CC Npi-specific link is not.
+Side effects: cohpi 2-track tuple rate 0.0779 vs 0.0811, n_trk>=2 without short track 0.8% (real 0), pion range on
+the curve 72% (real 93%).
