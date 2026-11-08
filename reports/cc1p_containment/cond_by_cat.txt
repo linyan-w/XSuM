@@ -25,3 +25,12 @@
   NC                         XSuM      1.000      0.988      0.811      0.977      0.924      0.866      0.662
   numu CC 1p0pi (any cont.)  real      1.000      0.997      0.230      0.994      0.876      0.677      0.016
   numu CC 1p0pi (any cont.)  XSuM      1.000      0.993      0.255      0.990      0.866      0.684      0.050
+== diag_hyb   pass rate on own 2prong population:      c_vtx c_t1_start   c_t1_end c_t2_start   c_t2_end     c_side  contained
+  numu CC Npi                real      1.000      0.986      0.440      0.976      0.787      0.813      0.273
+  numu CC Npi                XSuM      1.000      0.990      0.454      0.973      0.781      0.819      0.286
+  numu CC other 0pi          real      1.000      0.990      0.510      0.975      0.895      0.820      0.358
+  numu CC other 0pi          XSuM      1.000      0.991      0.510      0.980      0.897      0.815      0.366
+  NC                         real      1.000      0.989      0.812      0.978      0.918      0.845      0.643
+  NC                         XSuM      1.000      0.986      0.786      0.980      0.915      0.840      0.626
+  numu CC 1p0pi (any cont.)  real      1.000      0.997      0.230      0.994      0.876      0.677      0.016
+  numu CC 1p0pi (any cont.)  XSuM      1.000      0.995      0.245      0.991      0.869      0.681      0.038
