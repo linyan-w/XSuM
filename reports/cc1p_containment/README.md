@@ -150,3 +150,23 @@ M2t samples from truth alone, independent of the flow's longest track. Next: one
 group presence and the always-present variables (stage 1), optional groups conditioned on it (stage 2).
 
 Deleted 2026-11-08 (superseded studies): /pnfs datasets surrogate_hyb_realslc_m3w0_pfp, surrogate_official_m2w_pfp, surrogate_official_m2t_pfp and their generated parquets; the result files here are kept.
+
+## M2s: two-stage M2 (`--two-stage --walls --range-curve`), 2026-11-08
+
+`accept_m2s.txt`, `diag_m2s_summary.txt`, `m2_purity_m2s.txt`, `topo_m2s.txt` (dataset `surrogate_official_m2s_pfp`, jobs 0-199).
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| M2s | 3,198 | 0.165 / 0.396 | 0.454 / 0.342 | 0.090 / 0.876 |
+
+The targeted link closes: CC Npi at slice n_pfp=3 longest end in FV 0.442 (real 0.439, M2w 0.491, M2t 0.494); the
+other n_pfp cells and categories also agree. Consistency: n_trk>=2 without short track 0; rule fixes after stage 1
+0.03-0.9% (n_proton 0.9%, short-for-n_trk=2 0.7%, two-outside-2trk 0.8%).
+But the chain loses 2prong events (primary eff at 2prong 0.573 vs real 0.671): P(PFP 2prong | slice n_pfp=3) 0.85
+vs 0.97 for signal, 0.73 vs 0.93 for CC Npi. Cause: the dequantised counts in the stage-1 flow do not keep the joint
+count lattice. 17% of generated slices carry a (n_pfp, n_prong, n_trk, n_proton, n_shower) tuple that real slices do
+not populate (P < 1e-4), n_pfp = n_trk + n_shower + 1 holds for 0.504 (real 0.590), and (3,2,2,*,0) is 0.341 of
+n_pfp=3 (real 0.439). M4 then builds fewer 2-track sets. The muon end beyond the wall is 4.3% (real 0.06%); M2w had
+the same. Fix to try: keep the counts categorical (topology class) inside stage 1.
