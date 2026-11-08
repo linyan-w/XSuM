@@ -3,11 +3,18 @@
 real (Pandora) vs XSuM surrogate, on the held-out test files, with efficiency, purity and the real/surrogate overlap
 of selected neutrinos per stage.
 
+Two signal definitions are counted. Primary (XSuM acceptance): the notebook's topology, momentum caps and true
+vertex in the FV (outside the cathode band), without the truth containment of the muon and proton end points. A truth-containment boundary is sharp where
+the end point is set by stochastic processes, so events just inside and just outside it are interchangeable; any
+end-point imperfection then moves efficiency against one definition while the reco containment cut still selects
+the same mixture (reports/cc1p_containment/README.md). Secondary: the notebook's definition with truth containment.
+
 Differences to the notebook, by necessity: the notebook's private FV helpers (InFV det="SBND_Gen1",
 PER_TPC_INCATHODE_CM) are not in any cafpyana branch; this script uses cafpyana's SBND FV (|x|,|y| < 190,
 10 < z < 450) and a 10 cm per-TPC cathode margin, identically for both samples. Restricted to test files.
 
 usage: python3 check_cc1p0pi_stages.py <surrogate dir> <first job> <last job + 1>   -> prints one CSV-like block
+(stage, real sel, real sig, XSuM sel, XSuM sig, both, real sig_topo, XSuM sig_topo, both sig_topo)
 """
 import sys
 import numpy as np
@@ -31,11 +38,12 @@ def per_tpc(points):
     return allfv & (t1 | t2)
 
 
-def truth_signal(mcnu, mcprim):
+def truth_signal(mcnu, mcprim, contained=True):
     prim = mcprim.copy(); prim["p"] = np.sqrt(prim.genp_x**2 + prim.genp_y**2 + prim.genp_z**2)
     lv = list(mcnu.index.names); g = lambda m: m.groupby(level=lv).sum().reindex(mcnu.index).fillna(0)
     nmu = g((prim.pdg.abs() == 13) & (prim.p > 0.22)); npr = g((prim.pdg == 2212) & (prim.p > 0.30)); npi = g((prim.pdg.abs() == 211) & (prim.p > 0.07))
     topo = (mcnu.pdg == 14) & (mcnu.iscc == 1) & (nmu == 1) & (npr == 1) & (npi == 0) & (mcnu.npi0 == 0) & (mcnu.mu_totp < 1.0) & (mcnu.p_totp < 1.0)
+    if not contained: return topo.to_numpy(bool) & per_tpc([(mcnu.position_x, mcnu.position_y, mcnu.position_z)])
     cont = per_tpc([(mcnu.position_x, mcnu.position_y, mcnu.position_z), (mcnu.mu_end_x, mcnu.mu_end_y, mcnu.mu_end_z), (mcnu.p_end_x, mcnu.p_end_y, mcnu.p_end_z)])
     return topo.to_numpy(bool) & cont
 
@@ -87,12 +95,13 @@ if __name__ == "__main__":
     jobs = range(j0, j1)
     mcnu = ts.load_test("real", "mcnu", jobs); mcprim = ts.load_test("real", "mcprim", jobs)
     sig = truth_signal(mcnu, mcprim); sig_ids = set(mcnu.index[sig]); all_ids = set(mcnu.index)
+    topo_ids = set(mcnu.index[truth_signal(mcnu, mcprim, contained=False)])
     rslc = best_matched(ts.load_test("real", "slc", jobs, matched_only=False), mcnu)
     rpfp = ts.load_test("real", "pfp", jobs, matched_only=False)
     rpfp = rpfp[rpfp.index.droplevel(-1).isin(rslc.index) & (rpfp.trk_len.notna() | ((rpfp.shw_bestplane_energy > -4) & (rpfp.shw_len > 0)))]
     sslc = ts.load_test("surrogate", "slc", jobs); spfp = ts.load_test("surrogate", "pfp", jobs)
     R, S = stages(rslc, rpfp), stages(sslc, spfp)
-    print(f"#jobs {j0}-{j1-1} n_nu {len(all_ids)} n_signal {len(sig_ids)}")
+    print(f"#jobs {j0}-{j1-1} n_nu {len(all_ids)} n_signal {len(sig_ids)} n_signal_topo {len(topo_ids)}")
     for k in R:
         r, s_ = R[k] & all_ids, S[k] & all_ids
-        print(f"{k},{len(r)},{len(r & sig_ids)},{len(s_)},{len(s_ & sig_ids)},{len(r & s_)}", flush=True)
+        print(f"{k},{len(r)},{len(r & sig_ids)},{len(s_)},{len(s_ & sig_ids)},{len(r & s_)},{len(r & topo_ids)},{len(s_ & topo_ids)},{len(r & s_ & topo_ids)}", flush=True)

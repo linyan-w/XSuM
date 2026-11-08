@@ -42,3 +42,33 @@ Same 200 jobs, same script (`accept_m3.txt`, raw per group `accept_m3_raw.txt`):
 
 Most of the gap is closed; still ~13% low efficiency and ~20% excess background at the containment cut.
 Per-event real-vs-generated correlation of long_dirx 0.06 -> 0.57, muon_end_y 0.58 -> 0.95.
+
+## End-point models and the signal definition, 2026-11-07
+
+End-point precision models, same 200 jobs (`accept_m3b/m3e/m3g/m3w.txt`, diagnostics `diag_*_summary.txt`):
+M3b (bend fix) and M3e (end point as a direct target + PFP-to-particle cross-attention) left containment unchanged
+(longest-track end vs real ~20 cm 3D median). M3g (Geant4 start/end/length/flags on the particle tokens) cut it to
+7 cm; M3w (+ track ends on the TPC wall as flag + offset, + straight-line TPC exit point) reproduces the real
+pile-up of exiting track ends on the wall and halves the exiting-muon leak into the containment cut.
+The errors are a resolution, not a bias (signed medians < 0.5 cm); real ends plus the XSuM residuals with random
+signs reproduce the XSuM containment rates.
+
+Signal definition. With truth containment of the mu / p end points the signal sits on one side of a sharp boundary
+set by stochastic end points: any finite end-point resolution only moves signal out (and exiting background in),
+while the reco containment cut still selects the same mixture. Primary acceptance definition from now on (decided
+2026-11-07): numu CC 1mu1p0pi, p_mu and p_p < 1 GeV, true vertex in the FV outside the cathode band, no end-point
+containment (`accept2_*.txt`, 7,686 signal neutrinos); the notebook's definition (2,408) is kept as the second table.
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur |
+|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 |
+| M3 | 3,852 | 0.199 / 0.397 | 0.543 / 0.339 |
+| M3g | 4,086 | 0.208 / 0.391 | 0.582 / 0.343 |
+| M3w | 3,698 | 0.190 / 0.395 | 0.569 / 0.370 |
+
+| final (2prong-mup-PID) | selected | primary eff / pur | notebook eff / pur |
+|---|---|---|---|
+| real | 936 | 0.109 / 0.895 | 0.346 / 0.890 |
+| M3 | 942 | 0.106 / 0.861 | 0.305 / 0.780 |
+| M3g | 971 | 0.111 / 0.877 | 0.329 / 0.816 |
+| M3w | 910 | 0.104 / 0.876 | 0.316 / 0.836 |
