@@ -47,6 +47,35 @@ def load_sets(pfpsets_dir, max_slices=None, seed=0):
     return out
 
 
+def longest_track_end(X, valid):
+    """Per slice, the longest track: (end from the generated end point [n,3], end from start + length * direction [n,3],
+    start [n,3]); NaN where the slice has no track."""
+    g = lambda n: X[..., NAMES.index(n)]
+    L = np.where((g("has_trk") > 0.5) & valid, track_len(X), -1.0); L = np.nan_to_num(L, nan=-1.0)
+    i = L.argmax(1); r = np.arange(len(X)); ok = L[r, i] > 0
+    st = np.stack([g(f"start_{a}")[r, i] for a in "xyz"], 1); dsp = np.stack([g(f"disp_{a}")[r, i] for a in "xyz"], 1)
+    dr = np.stack([g(f"dir_{a}")[r, i] for a in "xyz"], 1); Lk = L[r, i][:, None]
+    nan = lambda v: np.where(ok[:, None], v, np.nan)
+    return nan(st + dsp), nan(st + Lk * dr), nan(st)
+
+
+def end_point_metrics(Xr, vr, Xg, vg):
+    """Same test slices, real vs generated longest track: per-event end-point error (generated end point and the
+    straight-line end start + len * dir), distribution-level FV containment of the end, lateral deviation from the
+    straight line."""
+    er, er_line, sr = longest_track_end(Xr, vr); eg, eg_line, sg = longest_track_end(Xg, vg)
+    both = np.isfinite(er[:, 0]) & np.isfinite(eg[:, 0])
+    fv = lambda e: (np.abs(e[:, 0]) < 190) & (np.abs(e[:, 1]) < 190) & (e[:, 2] > 10) & (e[:, 2] < 450)
+    q = lambda v: {"median": float(np.median(v)), "p90": float(np.percentile(v, 90)), "frac_gt10": float(np.mean(v > 10))}
+    out = {"n": int(both.sum()),
+           "err_end": q(np.linalg.norm(eg[both] - er[both], axis=1)),
+           "err_line_end": q(np.linalg.norm(eg_line[both] - er[both], axis=1)),
+           "lateral_real": q(np.linalg.norm(er[both] - er_line[both], axis=1)), "lateral_gen": q(np.linalg.norm(eg[both] - eg_line[both], axis=1)),
+           "end_in_fv_real": float(fv(er[np.isfinite(er[:, 0])]).mean()), "end_in_fv_gen": float(fv(eg[np.isfinite(eg[:, 0])]).mean()),
+           "line_end_in_fv_gen": float(fv(eg_line[np.isfinite(eg_line[:, 0])]).mean())}
+    return out
+
+
 def cohpi_counts(X, valid):
     """n_prong, n_trk, n_proton, n_shower from a raw PFP-set array (cohpi definitions on PFPs within 50 cm)."""
     g = lambda n: X[..., NAMES.index(n)]
@@ -150,6 +179,11 @@ def run(table_dir, pfpsets_dir, out_dir, device="cuda", epochs=20, seed=0, max_s
             rr, ff = fwd(r, tf), fwd(f, tf); rr, ff = rr[np.isfinite(rr)], ff[np.isfinite(ff)]
             percol[name] = sample_vs_real_1d(rr, ff) if len(rr) > 10 and len(ff) > 10 else {"w1": float("nan")}
     metrics["per_field"] = percol
+    metrics["end_point"] = end_point_metrics(Xr, vr, Xg, pm)
+    ep = metrics["end_point"]
+    print(f"end point (longest track, same test slices): |gen-real| median {ep['err_end']['median']:.1f} cm (straight line {ep['err_line_end']['median']:.1f}), "
+          f">10 cm {ep['err_end']['frac_gt10']:.2f}; lateral real {ep['lateral_real']['median']:.1f} gen {ep['lateral_gen']['median']:.1f}; "
+          f"end in FV real {ep['end_in_fv_real']:.4f} gen {ep['end_in_fv_gen']:.4f} (straight line {ep['line_end_in_fv_gen']:.4f})", flush=True)
     cr, cg = cohpi_counts(Xr, vr), cohpi_counts(Xg, pm)
     two_r = (cr["n_prong"] == 2) & (cr["n_trk"] == 2) & (cr["n_proton"] == 0) & (cr["n_shower"] == 0)
     two_g = (cg["n_prong"] == 2) & (cg["n_trk"] == 2) & (cg["n_proton"] == 0) & (cg["n_shower"] == 0)

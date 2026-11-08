@@ -1,0 +1,10 @@
+muon: 189277 contained, p < 1.0 GeV, median chord 100 cm
+   best straight-line predictor |pred - G4 end|: median   9.9  p90  28.2  >10cm 0.49
+     length part (straggling, interactions):   median   1.6  p90   7.2  >10cm 0.05
+     direction part (multiple scattering):     median   9.1  p90  26.9  >10cm 0.46
+   perfect surrogate vs reality (two draws):    median  14.5  p90  39.8  >10cm 0.64
+proton: 1153156 contained, p < 1.0 GeV, median chord 1 cm
+   best straight-line predictor |pred - G4 end|: median   0.1  p90   2.1  >10cm 0.04
+     length part (straggling, interactions):   median   0.0  p90   0.9  >10cm 0.04
+     direction part (multiple scattering):     median   0.1  p90   0.9  >10cm 0.00
+   perfect surrogate vs reality (two draws):    median   0.1  p90   4.4  >10cm 0.07
