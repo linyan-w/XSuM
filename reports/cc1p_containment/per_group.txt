@@ -1,0 +1,104 @@
+jobs 0-24: test neutrinos 23036, true CC1p0pi signal 1287
+Pandora (real end points)      2-prong                    selected   1004  signal   485  eff 0.3768  purity 0.483
+Pandora (real end points)      2-prong, mu contained      selected    335  signal   178  eff 0.1383  purity 0.531
+Pandora (real end points)      2-prong, p contained       selected    698  signal   447  eff 0.3473  purity 0.640
+Pandora (real end points)      2-prong, both contained    selected    299  signal   161  eff 0.1251  purity 0.538
+Pandora (straight-line ends)   2-prong                    selected   1004  signal   485  eff 0.3768  purity 0.483
+Pandora (straight-line ends)   2-prong, mu contained      selected    345  signal   186  eff 0.1445  purity 0.539
+Pandora (straight-line ends)   2-prong, p contained       selected    702  signal   450  eff 0.3497  purity 0.641
+Pandora (straight-line ends)   2-prong, both contained    selected    310  signal   170  eff 0.1321  purity 0.548
+XSuM generated                 2-prong                    selected   1029  signal   496  eff 0.3854  purity 0.482
+XSuM generated                 2-prong, mu contained      selected    353  signal   187  eff 0.1453  purity 0.530
+XSuM generated                 2-prong, p contained       selected    718  signal   451  eff 0.3504  purity 0.628
+XSuM generated                 2-prong, both contained    selected    330  signal   173  eff 0.1344  purity 0.524
+jobs 25-49: test neutrinos 23437, true CC1p0pi signal 1305
+Pandora (real end points)      2-prong                    selected   1087  signal   525  eff 0.4023  purity 0.483
+Pandora (real end points)      2-prong, mu contained      selected    344  signal   199  eff 0.1525  purity 0.578
+Pandora (real end points)      2-prong, p contained       selected    746  signal   473  eff 0.3625  purity 0.634
+Pandora (real end points)      2-prong, both contained    selected    317  signal   181  eff 0.1387  purity 0.571
+Pandora (straight-line ends)   2-prong                    selected   1087  signal   525  eff 0.4023  purity 0.483
+Pandora (straight-line ends)   2-prong, mu contained      selected    347  signal   204  eff 0.1563  purity 0.588
+Pandora (straight-line ends)   2-prong, p contained       selected    746  signal   473  eff 0.3625  purity 0.634
+Pandora (straight-line ends)   2-prong, both contained    selected    321  signal   186  eff 0.1425  purity 0.579
+XSuM generated                 2-prong                    selected   1056  signal   539  eff 0.4130  purity 0.510
+XSuM generated                 2-prong, mu contained      selected    340  signal   197  eff 0.1510  purity 0.579
+XSuM generated                 2-prong, p contained       selected    747  signal   495  eff 0.3793  purity 0.663
+XSuM generated                 2-prong, both contained    selected    318  signal   183  eff 0.1402  purity 0.575
+jobs 50-74: test neutrinos 22055, true CC1p0pi signal 1223
+Pandora (real end points)      2-prong                    selected    980  signal   493  eff 0.4031  purity 0.503
+Pandora (real end points)      2-prong, mu contained      selected    366  signal   219  eff 0.1791  purity 0.598
+Pandora (real end points)      2-prong, p contained       selected    708  signal   450  eff 0.3679  purity 0.636
+Pandora (real end points)      2-prong, both contained    selected    335  signal   199  eff 0.1627  purity 0.594
+Pandora (straight-line ends)   2-prong                    selected    980  signal   493  eff 0.4031  purity 0.503
+Pandora (straight-line ends)   2-prong, mu contained      selected    364  signal   220  eff 0.1799  purity 0.604
+Pandora (straight-line ends)   2-prong, p contained       selected    706  signal   451  eff 0.3688  purity 0.639
+Pandora (straight-line ends)   2-prong, both contained    selected    333  signal   201  eff 0.1643  purity 0.604
+XSuM generated                 2-prong                    selected    984  signal   479  eff 0.3917  purity 0.487
+XSuM generated                 2-prong, mu contained      selected    358  signal   204  eff 0.1668  purity 0.570
+XSuM generated                 2-prong, p contained       selected    702  signal   435  eff 0.3557  purity 0.620
+XSuM generated                 2-prong, both contained    selected    326  signal   183  eff 0.1496  purity 0.561
+jobs 75-99: test neutrinos 23407, true CC1p0pi signal 1339
+Pandora (real end points)      2-prong                    selected   1047  signal   515  eff 0.3846  purity 0.492
+Pandora (real end points)      2-prong, mu contained      selected    342  signal   191  eff 0.1426  purity 0.558
+Pandora (real end points)      2-prong, p contained       selected    728  signal   464  eff 0.3465  purity 0.637
+Pandora (real end points)      2-prong, both contained    selected    312  signal   172  eff 0.1285  purity 0.551
+Pandora (straight-line ends)   2-prong                    selected   1047  signal   515  eff 0.3846  purity 0.492
+Pandora (straight-line ends)   2-prong, mu contained      selected    340  signal   191  eff 0.1426  purity 0.562
+Pandora (straight-line ends)   2-prong, p contained       selected    726  signal   465  eff 0.3473  purity 0.640
+Pandora (straight-line ends)   2-prong, both contained    selected    311  signal   173  eff 0.1292  purity 0.556
+XSuM generated                 2-prong                    selected   1099  signal   542  eff 0.4048  purity 0.493
+XSuM generated                 2-prong, mu contained      selected    366  signal   211  eff 0.1576  purity 0.577
+XSuM generated                 2-prong, p contained       selected    751  signal   491  eff 0.3667  purity 0.654
+XSuM generated                 2-prong, both contained    selected    334  signal   190  eff 0.1419  purity 0.569
+jobs 100-124: test neutrinos 22631, true CC1p0pi signal 1238
+Pandora (real end points)      2-prong                    selected   1026  signal   493  eff 0.3982  purity 0.481
+Pandora (real end points)      2-prong, mu contained      selected    347  signal   185  eff 0.1494  purity 0.533
+Pandora (real end points)      2-prong, p contained       selected    719  signal   449  eff 0.3627  purity 0.624
+Pandora (real end points)      2-prong, both contained    selected    319  signal   173  eff 0.1397  purity 0.542
+Pandora (straight-line ends)   2-prong                    selected   1026  signal   493  eff 0.3982  purity 0.481
+Pandora (straight-line ends)   2-prong, mu contained      selected    352  signal   191  eff 0.1543  purity 0.543
+Pandora (straight-line ends)   2-prong, p contained       selected    720  signal   448  eff 0.3619  purity 0.622
+Pandora (straight-line ends)   2-prong, both contained    selected    323  signal   178  eff 0.1438  purity 0.551
+XSuM generated                 2-prong                    selected    972  signal   468  eff 0.3780  purity 0.481
+XSuM generated                 2-prong, mu contained      selected    344  signal   180  eff 0.1454  purity 0.523
+XSuM generated                 2-prong, p contained       selected    673  signal   419  eff 0.3384  purity 0.623
+XSuM generated                 2-prong, both contained    selected    318  signal   166  eff 0.1341  purity 0.522
+jobs 125-149: test neutrinos 21655, true CC1p0pi signal 1196
+Pandora (real end points)      2-prong                    selected   1010  signal   460  eff 0.3846  purity 0.455
+Pandora (real end points)      2-prong, mu contained      selected    357  signal   200  eff 0.1672  purity 0.560
+Pandora (real end points)      2-prong, p contained       selected    676  signal   415  eff 0.3470  purity 0.614
+Pandora (real end points)      2-prong, both contained    selected    321  signal   180  eff 0.1505  purity 0.561
+Pandora (straight-line ends)   2-prong                    selected   1010  signal   460  eff 0.3846  purity 0.455
+Pandora (straight-line ends)   2-prong, mu contained      selected    362  signal   203  eff 0.1697  purity 0.561
+Pandora (straight-line ends)   2-prong, p contained       selected    674  signal   414  eff 0.3462  purity 0.614
+Pandora (straight-line ends)   2-prong, both contained    selected    327  signal   184  eff 0.1538  purity 0.563
+XSuM generated                 2-prong                    selected    990  signal   463  eff 0.3871  purity 0.468
+XSuM generated                 2-prong, mu contained      selected    340  signal   193  eff 0.1614  purity 0.568
+XSuM generated                 2-prong, p contained       selected    659  signal   417  eff 0.3487  purity 0.633
+XSuM generated                 2-prong, both contained    selected    309  signal   177  eff 0.1480  purity 0.573
+jobs 150-174: test neutrinos 20792, true CC1p0pi signal 1136
+Pandora (real end points)      2-prong                    selected    902  signal   449  eff 0.3952  purity 0.498
+Pandora (real end points)      2-prong, mu contained      selected    316  signal   183  eff 0.1611  purity 0.579
+Pandora (real end points)      2-prong, p contained       selected    608  signal   397  eff 0.3495  purity 0.653
+Pandora (real end points)      2-prong, both contained    selected    286  signal   165  eff 0.1452  purity 0.577
+Pandora (straight-line ends)   2-prong                    selected    902  signal   449  eff 0.3952  purity 0.498
+Pandora (straight-line ends)   2-prong, mu contained      selected    316  signal   185  eff 0.1629  purity 0.585
+Pandora (straight-line ends)   2-prong, p contained       selected    609  signal   398  eff 0.3504  purity 0.654
+Pandora (straight-line ends)   2-prong, both contained    selected    288  signal   167  eff 0.1470  purity 0.580
+XSuM generated                 2-prong                    selected    932  signal   455  eff 0.4005  purity 0.488
+XSuM generated                 2-prong, mu contained      selected    345  signal   194  eff 0.1708  purity 0.562
+XSuM generated                 2-prong, p contained       selected    651  signal   415  eff 0.3653  purity 0.637
+XSuM generated                 2-prong, both contained    selected    321  signal   184  eff 0.1620  purity 0.573
+jobs 175-199: test neutrinos 22318, true CC1p0pi signal 1207
+Pandora (real end points)      2-prong                    selected    979  signal   451  eff 0.3737  purity 0.461
+Pandora (real end points)      2-prong, mu contained      selected    330  signal   177  eff 0.1466  purity 0.536
+Pandora (real end points)      2-prong, p contained       selected    660  signal   420  eff 0.3480  purity 0.636
+Pandora (real end points)      2-prong, both contained    selected    306  signal   165  eff 0.1367  purity 0.539
+Pandora (straight-line ends)   2-prong                    selected    979  signal   451  eff 0.3737  purity 0.461
+Pandora (straight-line ends)   2-prong, mu contained      selected    333  signal   177  eff 0.1466  purity 0.532
+Pandora (straight-line ends)   2-prong, p contained       selected    660  signal   420  eff 0.3480  purity 0.636
+Pandora (straight-line ends)   2-prong, both contained    selected    312  signal   168  eff 0.1392  purity 0.538
+XSuM generated                 2-prong                    selected   1029  signal   500  eff 0.4143  purity 0.486
+XSuM generated                 2-prong, mu contained      selected    363  signal   218  eff 0.1806  purity 0.601
+XSuM generated                 2-prong, p contained       selected    703  signal   460  eff 0.3811  purity 0.654
+XSuM generated                 2-prong, both contained    selected    342  signal   204  eff 0.1690  purity 0.596

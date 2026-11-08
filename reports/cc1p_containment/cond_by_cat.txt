@@ -1,0 +1,36 @@
+== diag   pass rate on own 2prong population:      c_vtx c_t1_start   c_t1_end c_t2_start   c_t2_end     c_side  contained
+  numu CC Npi                real      1.000      0.986      0.440      0.976      0.787      0.813      0.273
+  numu CC Npi                XSuM      1.000      0.984      0.546      0.979      0.824      0.829      0.369
+  numu CC other 0pi          real      1.000      0.990      0.510      0.975      0.895      0.820      0.358
+  numu CC other 0pi          XSuM      1.000      0.995      0.548      0.981      0.917      0.808      0.402
+  NC                         real      1.000      0.989      0.812      0.978      0.918      0.845      0.643
+  NC                         XSuM      1.000      0.988      0.785      0.983      0.930      0.838      0.635
+  numu CC 1p0pi (any cont.)  real      1.000      0.997      0.230      0.994      0.876      0.677      0.016
+  numu CC 1p0pi (any cont.)  XSuM      1.000      0.993      0.275      0.991      0.878      0.680      0.066
+== diag_m3w   pass rate on own 2prong population:      c_vtx c_t1_start   c_t1_end c_t2_start   c_t2_end     c_side  contained
+  numu CC Npi                real      1.000      0.986      0.440      0.976      0.787      0.813      0.273
+  numu CC Npi                XSuM      1.000      0.980      0.514      0.977      0.808      0.846      0.342
+  numu CC other 0pi          real      1.000      0.990      0.510      0.975      0.895      0.820      0.358
+  numu CC other 0pi          XSuM      1.000      0.994      0.531      0.977      0.896      0.818      0.379
+  NC                         real      1.000      0.989      0.812      0.978      0.918      0.845      0.643
+  NC                         XSuM      1.000      0.988      0.807      0.975      0.921      0.863      0.658
+  numu CC 1p0pi (any cont.)  real      1.000      0.997      0.230      0.994      0.876      0.677      0.016
+  numu CC 1p0pi (any cont.)  XSuM      1.000      0.992      0.244      0.990      0.865      0.676      0.033
+== diag_m3w0   pass rate on own 2prong population:      c_vtx c_t1_start   c_t1_end c_t2_start   c_t2_end     c_side  contained
+  numu CC Npi                real      1.000      0.986      0.440      0.976      0.787      0.813      0.273
+  numu CC Npi                XSuM      1.000      0.985      0.519      0.982      0.827      0.830      0.347
+  numu CC other 0pi          real      1.000      0.990      0.510      0.975      0.895      0.820      0.358
+  numu CC other 0pi          XSuM      1.000      0.993      0.531      0.980      0.904      0.814      0.379
+  NC                         real      1.000      0.989      0.812      0.978      0.918      0.845      0.643
+  NC                         XSuM      1.000      0.988      0.811      0.977      0.924      0.866      0.662
+  numu CC 1p0pi (any cont.)  real      1.000      0.997      0.230      0.994      0.876      0.677      0.016
+  numu CC 1p0pi (any cont.)  XSuM      1.000      0.993      0.255      0.990      0.866      0.684      0.050
+== diag_hyb   pass rate on own 2prong population:      c_vtx c_t1_start   c_t1_end c_t2_start   c_t2_end     c_side  contained
+  numu CC Npi                real      1.000      0.986      0.440      0.976      0.787      0.813      0.273
+  numu CC Npi                XSuM      1.000      0.990      0.454      0.973      0.781      0.819      0.286
+  numu CC other 0pi          real      1.000      0.990      0.510      0.975      0.895      0.820      0.358
+  numu CC other 0pi          XSuM      1.000      0.991      0.510      0.980      0.897      0.815      0.366
+  NC                         real      1.000      0.989      0.812      0.978      0.918      0.845      0.643
+  NC                         XSuM      1.000      0.986      0.786      0.980      0.915      0.840      0.626
+  numu CC 1p0pi (any cont.)  real      1.000      0.997      0.230      0.994      0.876      0.677      0.016
+  numu CC 1p0pi (any cont.)  XSuM      1.000      0.995      0.245      0.991      0.869      0.681      0.038

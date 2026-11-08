@@ -7,6 +7,8 @@
 \usepackage{xcolor}
 \usepackage{placeins}
 \input{numbers.tex}
+\IfFileExists{m3_numbers.tex}{\input{m3_numbers.tex}}{}
+
 \newcommand{\real}{Pandora}
 
 \title{XSuM: a generative surrogate of the SBND reconstruction chain\\ trained on the BNB Monte Carlo --- technical note}
@@ -42,13 +44,14 @@ does not fix data/MC disagreement; it reproduces the MC detector response, inclu
 Scope decisions (2026-10-16): XSuM generates the complete reconstruction record, not analysis quantities.
 Selection flags, BDT scores and derived kinematics such as $|t|$ are recomputed downstream by the analysers
 (CC coherent pion: S.~Oh; charged kaons: T.~Wester) from the generated variables. Cosmic-only slices do not
-depend on the neutrino model and are reused from the MC. Generator-internal labels (interaction mode, CC/NC,
+depend on the neutrino model and are to be taken from the MC; they are not yet in the surrogated files. Generator-internal labels (interaction mode, CC/NC,
 $W$, $Q^2$, $E_\nu$, signal flags) are never inputs; they are kept in a separate label table for holdout tests.
 
 \begin{figure}[h]
 \centering\includegraphics[width=\textwidth]{io_schematic.pdf}
-\caption{Inputs, surrogate, generated record and downstream use. One row of the diagram is one true neutrino
-interaction.}
+\caption{XSuM as built: inputs, the chain of models (M3 encoder, M2 heads and flow, M4 set flow), what the surrogated
+files contain (generated, copied, missing), the validation done so far and the downstream use. Only implemented
+components are drawn; the remaining plans are listed in Sec.~\ref{sec:outlook}.}
 \label{fig:io}
 \end{figure}
 
@@ -97,8 +100,9 @@ dropped) and the true vertex. The M1 and M2 models use \nFeat{} fixed features d
 and its distances to the cathode and the walls; per species (mu, e, p, n, pi$^\pm$, pi$^0$, gamma, K$^\pm$,
 K$^0$, Lambda, Sigma) the multiplicity above the cohpi thresholds (27 / 30 / 20\,MeV for mu / pi / p), the
 summed and maximum kinetic energy and the leading particle's momentum, $\cos\theta$ and $p_T$; and totals
-(charged multiplicity, visible and total kinetic energy, electromagnetic energy, longitudinal momentum). The
-particle-set encoder (M3) will consume the particles directly.
+(charged multiplicity, visible and total kinetic energy, electromagnetic energy, longitudinal momentum). These
+summary features carry no azimuth; the particle-set encoder M3 (Sec.~\ref{sec:m3}) adds a learned embedding of the
+full list of final-state particles, momentum vectors included.
 
 \paragraph{Targets.} Tier 0: the number of matched slices and, per slice, which groups of variables exist
 (a second track, the two-track topology, hits within 1--4\,cm of the vertex) and the two containment flags.
@@ -224,15 +228,22 @@ so the full official sample takes a quarter of an hour), with the slice-multipli
 
 The particle-flow objects of a slice are generated as a set. Per matched slice the fitted PFPs (those with a track or
 shower fit; the few without either are counted separately) are sorted by distance to the vertex and padded to 12
-(99.99\% of slices have at most 12). Each PFP carries 29 fields: presence flags (track fit, shower fit, MCS fit,
-primary), distance to the vertex, track score, start point, direction, track length, range and MCS muon
+(99.99\% of slices have at most 12). Each PFP carries 38 fields (record layout v4): presence flags (track fit, shower fit, MCS fit,
+primary), distance to the vertex, track score, start point, direction, range and MCS muon
 momenta, chi2 for muon, proton (both calibrations), kaon and pion on the collection plane, PIDA and the chi2
-degrees of freedom, and the shower energy, length, opening angle, density, conversion gap and dE/dx. Flags are
+degrees of freedom, the shower energy, length, opening angle, density, conversion gap and dE/dx, and the track end
+point: the displacement end$-$start (3 numbers, generated independently of the direction, so that multiple
+scattering can bend the chord away from the initial direction), the excess of the track length over the chord, and
+per axis a flag that the end lies on a TPC wall plane with the outward offset from it. On generation flagged ends
+are snapped onto the wall plane plus the offset (Sec.~\ref{sec:ends}). Flags are
 dequantised, fields that do not exist for a PFP are filled with noise and restored from the flags after
-generation (sim2reco's prong convention). The conditioning vector (\mFourCond{} numbers) is the truth features,
-the topology one-hot and the generated slice block, so the PFP set is consistent with the slice record.
-Two softmax heads give the number of fitted and of empty PFPs; a masked set flow (transformer velocity net over
-the PFP tokens, flow matching) generates the records. Trained on \mFourN{} slices for \mFourEpochs{} epochs.
+generation (sim2reco's prong convention). The conditioning vector (\mFourCond{} numbers) is the truth features
+with the M3 embedding, the topology one-hot and the generated slice block, so the PFP set is consistent with the
+slice record. Only generator truth enters: no Geant4 quantity is an input (Sec.~\ref{sec:ends}).
+Two softmax heads give the number of fitted and of empty PFPs; a masked set flow (transformer velocity net, $d=256$, 4 layers, over
+the PFP tokens, flow matching) generates the records. Trained on \mFourN{} slices for \mFourEpochs{} epochs
+(45\,min on the RTX~3090); this is the shipped configuration M3w0 (2026-11-08). Earlier versions (v2: 29 fields,
+track end derived as start $+$ length $\times$ direction) are in the git history of this note.
 
 The number of fitted PFPs is predicted with \mFourNfitAcc\% accuracy (log loss \mFourNfitLL{} against
 \mFourNfitLLm{} marginal): the slice block already carries the multiplicities. Table~\ref{tab:m4fields}
@@ -243,13 +254,218 @@ PFPs against the same recomputation on the real PFPs; the exactly-two-tracks top
 \mFourTwoGen\% generated against \mFourTwoReal\% real (\mFourTwoSlc\% from the slice table itself).
 
 \begin{table}[h]\centering\small\input{m4_counts.tex}\caption{cohpi multiplicities recomputed from PFP sets, test slices.}\label{tab:m4counts}\end{table}
-\IfFileExists{figures/m4_official_v2/m4_marginals.png}{%
-\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m4_official_v2/m4_marginals.png}
+\IfFileExists{figures/m4_official_m3w0/m4_marginals.png}{%
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m4_official_m3w0/m4_marginals.png}
 \caption{PFP fields, generated set against \real{}, test slices (valid tokens).}\label{fig:m4marg}\end{figure}}{%
 \IfFileExists{figures/m4_official/m4_marginals.png}{%
 \begin{figure}[h]\centering\includegraphics[width=\textwidth]{figures/m4_official/m4_marginals.png}
 \caption{PFP fields, generated set against \real{}, test slices (valid tokens).}\label{fig:m4marg}\end{figure}}{}}
 \small\input{m4_fields.tex}\normalsize
+\FloatBarrier
+
+\section{M3: the full final-state particle list as input}
+\label{sec:m3}
+
+\paragraph{Motivation.} A collaborator's CC1p0pi selection (M.~Fernandez), run on the test files of
+\texttt{surrogate\_official\_v3\_pfp}, agreed with \real{} up to the two-prong stage and diverged at
+``2prong-contained'' (efficiency 0.626 real against 0.387 surrogate, Table~\ref{tab:m3accept}). That cut
+requires the vertex and both track end points inside the fiducial volume and on the same side of the cathode,
+and the signal definition requires the true muon and proton to stop in one TPC. Per-event comparison of
+\real{} and the surrogate on the same neutrinos located the cause: the transverse track directions were
+uncorrelated with the event (Pearson $+0.06$ for $x$, $+0.05$ for $y$, Table~\ref{tab:m3corr}). The summary
+features of Sec.~\ref{sec:io} hold each leading particle's $\cos\theta$ and $p_T$ but no azimuth, so the model
+could reproduce the containment \emph{rate} (Sec.~\ref{sec:m4}) but not \emph{which} events are contained, which is
+what a truth-defined containment signal tests.
+
+\paragraph{Inputs.} For every neutrino the post-FSI primaries (\texttt{mcprim}; neutrinos, nuclear fragments and
+the Bertini binding-energy pseudo-particle dropped) form a set of up to 32 tokens sorted by kinetic energy
+(0.45\% of neutrinos have more and lose their softest particles). Each token has a species class (12 classes as
+in Sec.~\ref{sec:io}) and $(p_x,p_y,p_z,T)$; it is embedded from the class and from its unit direction,
+$\log|p|$, $\log T$ and three geometric path lengths from the true vertex along its direction (to the cathode if
+it heads towards it, to the nearest $x$/$y$ wall, to the nearest $z$ wall). A context token carries the 80
+summary features.
+
+\paragraph{Encoder (stage A).} A 4-layer transformer ($d=128$, 4 heads) over the context and particle tokens,
+pooled to a 64-dimensional embedding, is trained on 3\,M matched slices of the training files for 6 epochs on
+the targets that matter for selection: the topology class (cross entropy), the group presence and containment
+flags (binary cross entropy) and the continuous slice block (masked mean squared error); 7\,min on the RTX~3090.
+The embedding is then frozen and appended to the summary features (144 inputs), and M2 and M4 are retrained
+unchanged on the new inputs (M2: 3\,M slices, 60 epochs; M4: 3\,M slices, 40 epochs). The dataset is then
+regenerated for all 17.9\,M neutrinos (5.92\,M slices, 14.06\,M PFPs).
+
+\begin{table}[h]\centering\small\input{m3_heads.tex}
+\caption{M2 heads on the test files with the summary features only (v3) and with the M3 embedding added.}\label{tab:m3heads}\end{table}
+
+\paragraph{Effect on M2 and M4.} The containment flags gain most (Table~\ref{tab:m3heads}: muon candidate AUC
+0.892$\to$0.965), as expected; the vertex-activity groups, the topology and the number of matched slices
+also improve. The M2 flow validation loss drops from \mThreeFlowA{} to \mThreeFlowB{}. The marginal closure
+of M2 and of M4 is unchanged: the median per-column $W_1$ of M2 is \mThreeWtwoB{} against \mThreeWtwoA{}, the
+median per-field $W_1$ of M4 \mThreeWfourB{} against \mThreeWfourA{} (the tables of Secs.~\ref{sec:m2}
+and~\ref{sec:m4} show the previous versions). Per event, the generated track directions and end points now
+follow the true event (Table~\ref{tab:m3corr}). The cohpi signal efficiency is unchanged
+(Table~\ref{tab:m3cohpi}).
+
+\begin{table}[h]\centering\small\input{m3_corr.tex}
+\caption{Pearson correlation, on the same test slices, between the \real{} value and the generated value.}\label{tab:m3corr}\end{table}
+\begin{table}[h]\centering\small\input{m3_cohpi.tex}
+\caption{cohpi cut flow for true cohpi-signal neutrinos (matched slices), \real{} against the two surrogate versions.}\label{tab:m3cohpi}\end{table}
+
+\paragraph{Acceptance test.} The collaborator's CC1p0pi cut flow
+(\texttt{scripts/check\_cc1p0pi\_stages.py}, a transcription of their notebook) is run on the test files of
+grid jobs 0--199 of the real production and of both surrogated datasets. For each stage the table lists the
+signal efficiency, the purity and the fraction of the \real{}-selected neutrinos that the surrogate also selects
+(overlap; it measures per-event agreement, not just rates).
+\IfFileExists{m3_accept.tex}{%
+\begin{table}[h]\centering\scriptsize\input{m3_accept.tex}
+\caption{CC1p0pi cut flow on the test files of jobs 0--199 (\mThreeAcceptHead).}\label{tab:m3accept}\end{table}
+
+
+The particle-set inputs close most of the gap. At ``2prong-contained'' the signal efficiency rises from 0.387 to
+0.543 (\real{} 0.626) and the purity from 0.243 to 0.339 (\real{} 0.431); the fraction of \real{}-selected
+neutrinos that the surrogate also selects rises from 0.31 to 0.42, and the gain carries through to the end of
+the selection (final efficiency 0.305 against 0.346, purity 0.780 against 0.890, previously 0.202 and 0.502).
+The selection is not yet closed: the surrogate still contains about 13\% too few signal events and about 20\%
+too much background at the containment cut. Sec.~\ref{sec:ends} follows this up: the track end points, the signal
+definition and the origin of the remaining purity gap.}{}
+\FloatBarrier
+
+\section{Track end points, the CC1p0pi signal definition and the purity gap}
+\label{sec:ends}
+
+All results in this section use the CC1p0pi cut flow on the test files of grid jobs 0--199, as in
+Sec.~\ref{sec:m3}, and the per-neutrino containment diagnostic (\texttt{scripts/diag\_cc1p\_containment.py}:
+the two longest good tracks of the \real{} and the surrogate slice, each containment condition separately, and a
+generator-truth category). Model names: M3 is the M4 v2 model behind \texttt{surrogate\_official\_m3\_pfp};
+the other names are variants of M4 only, with M2 and the M3 encoder unchanged.
+
+\paragraph{Resolution, not bias.} On the same neutrinos, the surrogate's end point of the longest track differs from
+\real{} by about 20\,cm (3D median) in M3, with signed medians below 0.5\,cm on every axis: a resolution. It still
+moves events one way through the containment cut, because truth-contained signal sits inside the boundary
+while exiting background piles up at the TPC wall, 10\,cm outside the FV. Real end points smeared with the XSuM
+residuals (random signs) reproduce the XSuM containment rates.
+
+\paragraph{Intrinsic floor.} How well can the end point be predicted from generator truth alone? Using the
+Geant4 truth only as a reference (\texttt{scripts/diag\_end\_floor.py}), for contained muons below 1\,GeV the
+best straight-line prediction from the vertex, direction and range misses the Geant4 end by 9.9\,cm (median; 1.6\,cm
+from straggling and interactions in the length, 9.1\,cm from multiple scattering in the direction). Two
+independent draws of a perfect surrogate differ by 14.5\,cm (median, 90\% quantile 40\,cm). Per-event agreement
+below this is not possible without Geant4 information; the target is the distribution, not the event.
+
+\paragraph{Signal definition (decided 2026-11-07).} The notebook's signal requires the true muon and proton end
+points inside one TPC's FV. That boundary is sharp and set by stochastic end points: any surrogate with the floor
+above moves signal out and exiting background in, while the reconstructed containment cut still selects the same
+mixture. The primary definition is now: $\nu_\mu$ CC with one muon, one proton and no pions, $p_\mu$ and $p_p$ below
+1\,GeV, true vertex in the FV outside the cathode band, no end-point containment (7,686 signal neutrinos); the
+notebook definition (2,408) is kept as the second table.
+
+\paragraph{End-point models tried.} M3b (a fix of the end-point bend) and M3e (the end point as a direct target plus
+PFP-to-particle cross-attention) left the end-point error and the containment unchanged. M3g put the Geant4
+start, end, length and containment flags on the particle tokens (error 20$\to$7\,cm) and M3w added the Geant4
+straight-line TPC exit point and the wall flag. Both are \emph{not admissible}: a surrogate for new generator
+models cannot use Geant4 quantities as inputs (decision 2026-11-07); they are kept only as diagnostics. The
+admissible pieces are the decoupled displacement and the wall flag and offset of layout v4
+(Sec.~\ref{sec:m4}). These are reconstruction-level targets: 21\% of real tracks end on a wall, sharply at
+$x=\pm201.3$\,cm and $z=0$, $500.5$\,cm, in a band at $|y|\approx199$--$204$\,cm.
+
+\paragraph{Particle cross-attention, ablation.} 1\,M slices, 15 epochs, no Geant4 inputs, the same test
+slices (Table~\ref{tab:attn}). Two layers gain 1\,cm in the per-event end-point distance and reach the two-draw
+floor; four layers add nothing; split by generator-truth class (CC N$\pi$, CC 0$\pi$ 1p, CC 0$\pi$ other,
+NC), the end-in-FV and on-wall rates do not change at all. Attention doubles the parameters and the training time
+and slows generation, so the shipped M4 has none. The straight line from the generated start, length and
+direction is closer to \real{} per event (12.8 against 14.3\,cm) because it has no lateral scatter (real
+7.9\,cm), but it cannot end on the wall; the decoupled end point reproduces both.
+
+\begin{table}[h]\centering\small
+\begin{tabular}{lcccc}\toprule
+particle attention layers & 0 & 2 & 4 & \real{} \\\midrule
+longest-track end, $|$gen$-$real$|$ median [cm] & 15.3 & 14.3 & 14.2 & 14.5 (floor) \\
+\quad straight line start $+$ len$\cdot$dir [cm] & 13.0 & 12.8 & 12.8 & \\
+lateral deviation from the straight line [cm] & 9.0 & 8.8 & 8.6 & 7.9 \\
+end in the FV & 0.470 & 0.469 & 0.472 & 0.497 \\
+end on the wall ($\pm3$\,cm) & 0.355 & 0.363 & 0.359 & 0.349 \\
+validation loss & 0.750 & 0.734 & 0.733 & \\
+parameters & 2.2\,M & 4.4\,M & 5.5\,M & \\
+training time & 7\,min & 20\,min & 25\,min & \\\bottomrule
+\end{tabular}
+\caption{PFP-to-particle cross-attention ablation (no Geant4 inputs), longest track per test slice.}\label{tab:attn}\end{table}
+
+\paragraph{The shipped M4 (M3w0).} No attention, layout v4, generator truth only, 3\,M slices, 40 epochs.
+Longest-track end against \real{}: 11.6\,cm per event (straight line 10.0), lateral deviation 7.8\,cm (\real{}
+7.9), end in FV 0.486 (0.497), on the wall 0.363 (0.349), outside the TPC 2.2\% (0.2\%). Per background category the
+wall pile-up is now reproduced (CC N$\pi$ longest track on the wall 0.36 against 0.43 real; M3 0.09, with 17\%
+of its ends outside the TPC), and when the real longest track ends on the wall the generated one does too in
+90\% of events (M3w with Geant4 inputs: 95\%). Table~\ref{tab:ends_accept} gives the acceptance.
+
+\begin{table}[h]\centering\small
+\begin{tabular}{lccccc}\toprule
+ & selected & primary eff / pur & notebook eff / pur & final primary eff / pur \\\midrule
+\real{} & 3,500 & 0.198 / 0.435 & 0.626 / 0.431 & 0.109 / 0.895 \\
+M3 & 3,852 & 0.199 / 0.397 & 0.543 / 0.339 & 0.106 / 0.861 \\
+M3w (Geant4 inputs, diagnostic) & 3,698 & 0.190 / 0.395 & 0.569 / 0.370 & 0.104 / 0.876 \\
+M3w0 (shipped) & 3,725 & 0.191 / 0.394 & 0.531 / 0.343 & 0.106 / 0.872 \\
+hybrid: \real{} slices $+$ M3w0 PFPs & 3,500 & 0.194 / 0.426 & 0.559 / 0.384 & 0.112 / 0.880 \\
+M2w: M2 with wall targets $+$ M3w0 & 3,639 & 0.185 / 0.390 & 0.515 / 0.341 & 0.106 / 0.870 \\\bottomrule
+\end{tabular}
+\caption{CC1p0pi at ``2prong-contained'' (selected, efficiency and purity under both signal definitions) and at
+the end of the selection (2prong-mup-PID), test files of jobs 0--199.}\label{tab:ends_accept}\end{table}
+
+\paragraph{Where the purity gap comes from.} Every M4 variant sits at purity 0.39--0.40 against 0.435, whatever
+its wall handling. The excess is background passing containment: CC N$\pi$ (contained fraction of its 2prong
+events 0.347 against 0.273), NC (0.662 against 0.643), other 0$\pi$ (0.379 against 0.358). Three checks locate it:
+\begin{itemize}
+\item In background events that both chains call 2prong, the on-wall rate of the longest track now agrees (0.53
+      against 0.54) yet more pass containment (0.155 against 0.128): it is not the wall in M4.
+\item The CC1p0pi 2prong and containment cuts applied inside the M4 closure (real slice block as condition, per
+      generator-truth class) give slightly \emph{fewer} contained background events than \real{} (CC N$\pi$ 0.282
+      against 0.300, NC 0.630 against 0.675): M4 alone does not produce the excess.
+\item A hybrid dataset, \real{} slice table with M3w0 PFPs, recovers the purity (0.426 against 0.435; CC N$\pi$
+      0.286, NC 0.626): about three quarters of the gap comes through the M2 slice block that M4 is conditioned on.
+\end{itemize}
+In the M2 slice block the excess is not in one variable: binned in any slice variable, the containment
+probability is higher in every bin, and the bin populations explain at most 100 of the 370 extra contained
+background events. The slice block misses the same geometry M4 missed (Table~\ref{tab:m2wall}): an exiting longest
+track has a length equal to the path from the vertex to the wall along its direction, and an exiting cohpi muon
+ends on the wall. M2's flow smears both, and M4 then builds tracks of the generated length that stop inside.
+\paragraph{M2 with wall targets (M2w).} The M4 treatment was applied to M2. A flag and an offset are added for the
+longest-track length against the path to the wall (flag when $|L/\ell_\mathrm{wall}-1|<0.03$). The cohpi muon and
+pion-candidate end points get a per-axis flag and an outward offset on the wall planes. The flags are dequantised
+in the flow and snapped after generation; M4 is unchanged (M3w0). The slice-block wall marginals now agree with
+\real{} (Table~\ref{tab:m2wall}), but the acceptance does not move (Table~\ref{tab:ends_accept}): purity 0.390
+against 0.394 for M3w0. The excess of contained background drops only from 370 to 324 events, and the final-stage
+numbers are unchanged. M2w also puts 4.2\% of cohpi muon ends outside the TPC (\real{} 0.06\%), because
+unflagged ends are not clipped.
+
+\paragraph{Where the excess really is.} With the primary signal definition (no true containment), the containment
+of the longest track closes for every truth category taken as a whole (CC N$\pi$ end in FV 0.514 against 0.513, NC
+0.810 against 0.815, 1$\mu$1p 0.403 against 0.403). It fails only in the 2prong subset of CC N$\pi$ (0.518 against
+0.440; hybrid 0.454). 2prong is set by the slice PFP count (93\% of $n_\mathrm{pfp}=3$ slices are 2prong) and M4
+follows it. In \real{} CC N$\pi$, slices with few PFPs have more exiting longest tracks (end in FV 0.439 at
+$n_\mathrm{pfp}=3$, 0.554 at 5); M2 generates the exit flat in $n_\mathrm{pfp}$ (0.49--0.51). For 1$\mu$1p the 2prong
+topology is 73\% of the events, so no tail is selected and the same defect does not show. The NC excess is a 5\%
+surplus of 2prong events, with containment closing.
+
+\paragraph{M2t: topology sampled after the flow.} A study in which the topology class is drawn after the flow from the
+truth features and the generated slice block (presence and spike heads on truth only, flow not conditioned on the
+topology), with the range momenta flagged on the length--momentum curve. Purity rises to 0.404 (efficiency 0.192),
+but through fewer background 2prong events (CC other 0$\pi$ 2,088 against 2,278), not through the targeted link:
+CC N$\pi$ at $n_\mathrm{pfp}=3$ stays at 0.494. On the M2 test slices of truth CC events with a charged pion (24.6k,
+vertex in FV) the topology head reproduces the \real{} link when fed the \real{} slice block (P($n_\mathrm{pfp}=3$ |
+end in FV / outside) 0.107 / 0.135 against \real{} 0.108 / 0.135) and loses it on the generated block (0.108 /
+0.112). Replacing one group of the \real{} block by the generated values (\texttt{scripts/diag\_m2\_swap.py})
+reduces the link most for the short-track group (from +0.028 to +0.016, mostly through whether a short track exists),
+less for the two-track group, the direction and the length; no single group restores it. The link is carried
+jointly by the longest track, the presence of the optional groups and the PFP counts, which M2 samples in separate
+pieces. Neither study is shipped; the shipped M2 is unchanged.
+
+\begin{table}[h]\centering\small
+\begin{tabular}{lccc}\toprule
+all matched slices, jobs 0--199 & \real{} & M2 & M2w \\\midrule
+longest track: length / path to the wall within $\pm2\%$ & 0.145 & 0.060 & 0.163 \\
+\quad length / path $>1.05$ & 0.076 & 0.133 & 0.091 \\
+cohpi muon end on the wall ($\pm3$\,cm) & 0.429 & 0.079 & 0.434 \\
+cohpi muon end outside the TPC ($<-3$\,cm) & 0.001 & 0.187 & 0.043 \\\bottomrule
+\end{tabular}
+\caption{Wall consistency of the slice block (\texttt{scripts/diag\_m2\_purity.py}).}\label{tab:m2wall}\end{table}
 \FloatBarrier
 
 \section{Surrogated datasets for the analysers}
@@ -289,17 +505,39 @@ generation), with the 26 generated fields laid out under the production column n
 points, no PFPs without a fit, and no induction-plane chi2 or truth-match columns. This is the first dataset in
 which every reconstructed object of the slice is surrogated.
 
+\texttt{surrogate\_official\_m3\_pfp} (2026-11-05) is the same construction with the M2 and M4 models retrained on
+the particle-set inputs of Sec.~\ref{sec:m3}: 5,923,999 generated slices and 14,061,560 PFPs, 2,000 files in
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m3\_pfp/}. It supersedes
+\texttt{surrogate\_official\_v3\_pfp} for any selection that uses track directions or containment.
+
+\texttt{surrogate\_official\_m3w0\_pfp} (2026-11-08) replaces the PFP table with the shipped M4 (M3w0,
+Sec.~\ref{sec:ends}): generated track end points with the wall pile-up, generator truth only; same M2 slices
+(5,923,999) and 14,061,560 PFPs (94\,min of generation). Written so far for the test files of jobs 0--199 in
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m3w0\_pfp/}; the other 1,800 jobs follow
+after review.
+
 \section{Outlook}
 \label{sec:outlook}
 
+Done so far: the official sample, M1 baselines, M2 (slice block), M3 (particle-set encoder, stage A), M4 (PFP set, generated track ends on the wall),
+and production-format surrogated datasets for the analysers. Remaining:
 \begin{enumerate}
-\item Official sample (9.94\,M triggers): retrain M1/M2, add the \texttt{mcdaught} and full-PFP tables.
-\item M3: particle-set encoder (transformer over primaries + vertex token) replacing the fixed features.
-\item M4 (first version in Sec.~\ref{sec:m4}): generated \texttt{pfp} tables in the surrogated datasets, chi2 on the
-      induction planes and track end points, cross-attention to particle tokens (M3), Bayesian last layers.
+\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): a two-stage M2, with one flow over the always-present
+      variables (vertex, scores, longest track), the PFP counts and the group-presence flags, and a second flow
+      for the optional groups conditioned on it and masked by the generated presence.
+\item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
+\item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
+      \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and
+      M2 generate them as independent numbers and smear the sharp range peak of stopping pions
+      (Fig.~\ref{fig:m1two}; M2 peak fraction 0.17 against 0.22). M2t flags them on the curve and snaps them, but
+      reaches only 72\% on the curve for the pion; to be carried into the two-stage M2, with the M2 version of
+      that figure.
+\item M4 completeness: induction-plane chi2, PFPs without a fit, PFP truth-match columns.
+\item Cosmic-only and unmatched slices in the surrogated files (taken from the MC).
+\item Uncertainty: Bayesian last layers or ensembles, an out-of-support flag per generated record.
 \item Holdouts: train on $|t|<0.1$, test the tail; low versus high $E_\nu$; forward versus wide-angle muons;
       $\le 2$ versus $\ge 3$ charged primaries; one TPC versus the other.
-\item Surrogated dataframes written in the production format for the cohpi and kaon analysers.
+\item Collaborators' comparisons (cohpi, kaon, CC1p0pi) on the test files of \texttt{surrogate\_official\_m3w0\_pfp}.
 \end{enumerate}
 
 \end{document}

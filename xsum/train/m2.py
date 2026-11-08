@@ -40,6 +40,115 @@ SPEC = [
     ("cpi_end_x", "lin", "two"), ("cpi_end_y", "lin", "two"), ("cpi_end_z", "lin", "two"),
     ("sum_integ_1cm", "log", "s1"), ("sum_integ_2cm", "log", "s2"), ("sum_integ_3cm", "log", "s3"), ("sum_integ_4cm", "log", "s4"),
 ]
+# Wall targets (M2 only; M4 keeps conditioning on SPEC): an exiting longest track has a length equal to the path from the
+# vertex to the TPC wall along its direction, and an exiting cohpi track ends on a wall plane. A flow over the plain
+# coordinates smears both. Per event: a flag that the longest track's length / path is within WALL_LEN_BAND of 1 and the
+# offset (ratio - 1); per axis of the cohpi muon and pion-candidate end points, a flag that the end lies in the wall band
+# (xsum.prep.pfpset.WALL_REF / WALL_BAND, the planes read off the real PFP track ends) and the outward offset. Flags
+# are dequantised flow dimensions, offsets of tracks not on the wall are filled with noise; after generation flagged
+# lengths / coordinates are snapped (apply_walls).
+WALL_LEN_BAND = 0.03
+AV_LO, AV_HI = np.array([-201.3, -203.7, 0.0]), np.array([201.3, 203.7, 500.8])   # active volume for the path to the wall
+WALL_SPEC = [("long_wall", "flag", "base"), ("long_woff", "lin", "base")] + [
+    (f"{p}_end_{k}_{a}", "flag" if k == "wall" else "lin", "two") for p in ("muon", "cpi") for k in ("wall", "woff") for a in "xyz"]
+
+
+# Range momenta: the cohpi range_p_mu / range_p_cpi are functions of long_trk_len / short_trk_len (median deviation 0.03%,
+# 97% / 93% of slices within 2%); the flow generates a flag "on the curve" per momentum and flagged values are replaced
+# by the length-momentum curve (median log p in quantile bins of log length, fitted on the training slices) after the
+# wall snap, so exiting tracks get the momentum of their truncated length (apply_range).
+RANGE_BAND = 0.02
+RANGE_PAIRS = {"mu": ("range_p_mu", "long_trk_len"), "cpi": ("range_p_cpi", "short_trk_len")}
+RANGE_SPEC = [("range_mu_on", "flag", "two"), ("range_cpi_on", "flag", "two")]
+
+
+def fit_range_curves(T):
+    out = {}
+    for k, (pc, lc) in RANGE_PAIRS.items():
+        p, L = T[pc].to_numpy(np.float64), T[lc].to_numpy(np.float64); ok = np.isfinite(p) & np.isfinite(L) & (p > 0) & (L > 0)
+        x, y = np.log(L[ok]), np.log(p[ok]); e = np.unique(np.quantile(x, np.linspace(0, 1, 301))); c = 0.5 * (e[1:] + e[:-1])
+        b = np.clip(np.digitize(x, e) - 1, 0, len(c) - 1); med = np.array([np.median(y[b == i]) if (b == i).any() else np.nan for i in range(len(c))])
+        g = np.isfinite(med); out[k] = (c[g], med[g])
+    return out
+
+
+def range_from_len(L, curve):
+    with np.errstate(divide="ignore", invalid="ignore"): return np.exp(np.interp(np.log(L), *curve))
+
+
+def add_range_targets(T, curves):
+    for k, (pc, lc) in RANGE_PAIRS.items():
+        p = T[pc].to_numpy(np.float64); ok = np.isfinite(p)
+        r = p / range_from_len(T[lc].to_numpy(np.float64), curves[k]) - 1
+        T[f"range_{k}_on"] = np.where(ok, np.abs(r) < RANGE_BAND, np.nan).astype(np.float32)
+    return T
+
+
+def apply_range(df, curves):
+    """In place: flagged range momenta from the (wall-snapped) generated lengths."""
+    if curves is None or "range_mu_on" not in df.columns: return df
+    for k, (pc, lc) in RANGE_PAIRS.items():
+        on = df[f"range_{k}_on"].to_numpy() > 0.5; new = range_from_len(df[lc].to_numpy(np.float64), curves[k])
+        df[pc] = np.where(on & np.isfinite(new) & np.isfinite(df[pc].to_numpy()), new, df[pc].to_numpy())
+    return df
+
+
+def path_to_wall(vtx, d):
+    """Distance from vtx [n,3] along the unit direction d [n,3] to the active-volume boundary (inf where undefined)."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = np.where(d > 0, (AV_HI - vtx) / d, np.where(d < 0, (AV_LO - vtx) / d, np.inf))
+    return np.nan_to_num(t, nan=np.inf).min(1)
+
+
+def add_wall_targets(T, seed=0):
+    """Adds the WALL_SPEC columns (float32) to a slice table with the real reco values."""
+    from ..prep.pfpset import WALL_REF, WALL_BAND
+    rng = np.random.default_rng(seed); n = len(T)
+    L = T["long_trk_len"].to_numpy(np.float64)
+    r = L / path_to_wall(T[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64), T[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64)) - 1
+    has = np.isfinite(L) & (L > 0); on = has & (np.abs(r) < WALL_LEN_BAND)
+    T["long_wall"] = np.where(has, on, np.nan).astype(np.float32)
+    T["long_woff"] = np.where(on, r, rng.uniform(-WALL_LEN_BAND, WALL_LEN_BAND, n)).astype(np.float32)
+    for p in ("muon", "cpi"):
+        for a in "xyz":
+            e = T[f"{p}_end_{a}"].to_numpy(np.float64); lo, hi = WALL_REF[a]; (bl, bh) = WALL_BAND[a]
+            off = np.where(e > 0.5 * (lo + hi), e - hi, lo - e); ok = np.isfinite(e); on = ok & (off >= bl) & (off <= bh)
+            T[f"{p}_end_wall_{a}"] = np.where(ok, on, np.nan).astype(np.float32)
+            T[f"{p}_end_woff_{a}"] = np.where(on, off, rng.uniform(bl, bh, n)).astype(np.float32)
+    return T
+
+
+def apply_walls(df):
+    """In place on a generated slice frame with the WALL_SPEC columns: snap flagged longest-track lengths onto the path
+    to the wall and flagged cohpi end coordinates onto the wall plane plus the offset."""
+    from ..prep.pfpset import WALL_REF
+    if "long_wall" not in df.columns: return df
+    on = df["long_wall"].to_numpy() > 0.5
+    path = path_to_wall(df[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64), df[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64))
+    with np.errstate(invalid="ignore", over="ignore"): new = path * (1 + np.nan_to_num(df["long_woff"].to_numpy(np.float64), nan=0.0))
+    df["long_trk_len"] = np.where(on & np.isfinite(new) & (new > 0), new, df["long_trk_len"].to_numpy())
+    for p in ("muon", "cpi"):
+        for a in "xyz":
+            on = df[f"{p}_end_wall_{a}"].to_numpy() > 0.5; e = df[f"{p}_end_{a}"].to_numpy(np.float64)
+            lo, hi = WALL_REF[a]; off = np.nan_to_num(df[f"{p}_end_woff_{a}"].to_numpy(np.float64), nan=0.0)
+            df[f"{p}_end_{a}"] = np.where(on & np.isfinite(e), np.where(e > 0.5 * (lo + hi), hi + off, lo - off), e)
+    return df
+
+
+def wall_closure(real, gen):
+    """Wall consistency, real vs generated frames: longest track length / path within +-2%, cohpi muon end on the wall
+    (+-3 cm of the active volume) and outside it."""
+    out = {}
+    for lab, d in (("real", real), ("gen", gen)):
+        L = d["long_trk_len"].to_numpy(np.float64); ok = np.isfinite(L) & (L > 0)
+        r = L[ok] / path_to_wall(d[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64)[ok], d[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64)[ok])
+        e = d[["muon_end_x", "muon_end_y", "muon_end_z"]].to_numpy(np.float64); e = e[np.isfinite(e[:, 0])]
+        dw = np.minimum.reduce([AV_HI[0] - np.abs(e[:, 0]), AV_HI[1] - np.abs(e[:, 1]), e[:, 2], AV_HI[2] - e[:, 2]])
+        out[lab] = {"long_len_at_path": float(np.mean(np.abs(r - 1) < 0.02)), "long_len_beyond_path": float(np.mean(r > 1.05)),
+                    "muon_end_on_wall": float(np.mean(np.abs(dw) < 3)), "muon_end_outside": float(np.mean(dw < -3))}
+    return out
+
+
 GROUPS = ["short", "two", "s1", "s2", "s3", "s4"]
 FLAGS = ["is_muon_contained", "is_cpi_contained"]   # Bernoulli, defined on the two-track group
 COUNT_COLS = set()
@@ -55,13 +164,14 @@ def fwd(x, tf):
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
     if tf == "atanh": return np.arctanh(np.clip(x, -EDGE, EDGE))
-    return x
+    return x   # lin, flag
 
 
 def inv(y, tf):
     if tf == "log": return np.exp(y)
     if tf == "log1p": return np.maximum(np.expm1(y), 0.0)
     if tf == "atanh": return np.tanh(y)
+    if tf == "flag": return (y > 0.5).astype(np.float64)
     return y
 
 
@@ -79,13 +189,17 @@ class BlockTransform:
     def __init__(self, spec=SPEC):
         self.spec = spec; self.cols = [c for c, _, _ in spec]; self.groups = np.array([g for _, _, g in spec])
 
-    def matrix(self, df):
+    def matrix(self, df, seed=0):
         Y = np.stack([fwd(df[c].to_numpy(), tf) for c, tf, _ in self.spec], 1)
+        fl = [j for j, (_, tf, _) in enumerate(self.spec) if tf == "flag"]
+        if fl: Y[:, fl] += np.random.default_rng(seed).uniform(-0.4, 0.4, (len(Y), len(fl)))   # dequantised flags
         Y[:, self.cols.index("bcfm_score")][df["bcfm_score"].to_numpy() < -100] = np.nan   # -9999 sentinel: no flash match
         return Y
 
     def fit(self, Y):
         self.med = np.nanmedian(Y, 0); self.mad = 1.4826 * np.nanmedian(np.abs(Y - self.med), 0) + 1e-6
+        for j, (_, tf, _) in enumerate(self.spec):   # flags: mean / std (the MAD of a 0/1 column can vanish)
+            if tf == "flag": self.med[j] = np.nanmean(Y[:, j]); self.mad[j] = np.nanstd(Y[:, j]) + 1e-6
         return self
 
     def standardise(self, Y, clip=12.0):
@@ -209,7 +323,7 @@ def train_flow(Ztr, Mtr, Ctr, ktr, Zva, Mva, Cva, kva, n_classes, epochs, device
     t = lambda a: torch.tensor(a, device=device)
     Zt, Mt, Ct, kt = t(Ztr), t(Mtr), t(Ctr), torch.tensor(ktr, dtype=torch.long, device=device)
     Zv, Mv, Cv, kv = t(Zva), t(Mva), t(Cva), torch.tensor(kva, dtype=torch.long, device=device)
-    cond = lambda C, k: torch.cat([C, torch.nn.functional.one_hot(k, n_classes).to(C.dtype)], -1)
+    cond = (lambda C, k: C) if n_classes == 0 else (lambda C, k: torch.cat([C, torch.nn.functional.one_hot(k, n_classes).to(C.dtype)], -1))
     best, best_state, hist = np.inf, None, []
     for ep in range(epochs):
         model.train(); perm = torch.randperm(len(Zt), device=device); tl = 0.0; nb = 0
@@ -237,9 +351,22 @@ def sample_flow(model, C, M, device, n_steps=64, bs=65536):
     return np.concatenate(out)
 
 
-def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None):
+def topo_input(C, Z, M):
+    """Input of the topology head in topo_last models: truth features + the (generated or real) standardised slice
+    block, zero where masked, + the mask."""
+    return np.concatenate([C, Z * M, M], 1).astype(np.float32)
+
+
+def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=False,
+        topo_last=False, range_curve=False):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
-    then table_dir is expected to hold matched slices only (see scripts/split_official_table.py)."""
+    then table_dir is expected to hold matched slices only (see scripts/split_official_table.py).
+    Defaults = the shipped M2 (m2_official_m3). Studies (technote Sec. 8): walls (M2w), topo_last + range_curve (M2t).
+    walls: wall flag / offset targets for the longest-track length and the cohpi end points (WALL_SPEC, apply_walls).
+    topo_last: the topology class (joint PFP counts) is sampled AFTER the flow, from the truth features and the
+    generated slice block, so that counts follow the generated tracks (e.g. an exiting longest track <-> fewer PFPs);
+    presence and spike heads then see the truth features only and the flow is not conditioned on the topology.
+    range_curve: range momenta flagged on / off the length-momentum curve (RANGE_SPEC, apply_range)."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
@@ -259,8 +386,9 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         print("cardinality head trained on the card table", flush=True)
     card = pd.read_parquet(f"{table_dir}/targets.parquet", columns=["matched", "n_matched_slices"])
     F = pd.read_parquet(f"{table_dir}/features.parquet")
+    sub_rows = None
     if max_rows and len(F) > max_rows:
-        keep = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, card = F.iloc[keep], card.iloc[keep]
+        sub_rows = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, card = F.iloc[sub_rows], card.iloc[sub_rows]
     names = list(F.columns); X = np.ascontiguousarray(F.to_numpy(np.float32))
     F = F[["vtx_x", "vtx_y"]]          # only the vertex signs are needed later (point-mass values)
     file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
@@ -287,47 +415,27 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     F, X = F[keep], X[keep]
     tr, va, te = tr[keep], va[keep], te[keep]
     T = pd.read_parquet(f"{table_dir}/targets.parquet", columns=tcols)
-    if max_rows and len(T) > len(keep): T = T.iloc[np.sort(np.random.default_rng(seed).choice(len(T), len(keep), replace=False))]
+    if sub_rows is not None: T = T.iloc[sub_rows]          # same rows as the features
     T = T[keep]
+    assert T.index.equals(F.index), "targets and features are not row-aligned"
     for c in T.columns: T[c] = T[c].astype(np.float32)
+    if walls: T = add_wall_targets(T, seed)
     L = pd.read_parquet(f"{table_dir}/labels.parquet", columns=["is_signal_cohpi"])
-    if max_rows and len(L) > len(keep): L = L.iloc[np.sort(np.random.default_rng(seed).choice(len(L), len(keep), replace=False))]
+    if sub_rows is not None: L = L.iloc[sub_rows]
     L = L[keep]
     matched = np.ones(len(F), dtype=bool)
     std = Standardizer(X[tr]); C = std(X)
     import gc; gc.collect()
-    print(f"restricted to {len(F)} matched slices", flush=True)
+    import resource
+    def mem(tag): print(f"[mem] {tag}: peak RSS {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6:.1f} GB", flush=True)
+    print(f"restricted to {len(F)} matched slices", flush=True); mem("after load")
 
-    # topology: joint categorical over the PFP counts, sampled first and fed to every other component
-    topo = Topology(T, tr & matched); ktrue = topo.encode(T)
-    heads["topology"] = MLPClassifier(C.shape[1], topo.other + 1, device=device, seed=seed).fit(C[tr & matched], ktrue[tr & matched], C[va & matched], ktrue[va & matched])
-    Pt = heads["topology"].predict_proba(C[te & matched])
-    metrics["topology"] = {"n_classes": topo.other + 1, "frac_other_train": float((ktrue[tr & matched] == topo.other).mean()),
-                           "logloss": float(-np.log(np.clip(Pt[np.arange(len(Pt)), ktrue[te & matched]], 1e-9, None)).mean()),
-                           "logloss_marginal": float(-np.log(np.clip(np.bincount(ktrue[tr & matched], minlength=topo.other + 1)[ktrue[te & matched]] / (tr & matched).sum(), 1e-9, None)).mean()),
-                           "accuracy": float((Pt.argmax(1) == ktrue[te & matched]).mean())}
-    print("topology:", {k: round(v, 4) for k, v in metrics["topology"].items()}, flush=True)
-    def xh(mask, cap=2_000_000):
-        """features + topology one-hot for the rows of `mask` (subsampled to `cap` rows): built on demand, never for all rows."""
-        rows = np.flatnonzero(mask)
-        if len(rows) > cap: rows = np.sort(np.random.default_rng(seed).choice(rows, cap, replace=False))
-        return np.concatenate([X[rows], topo.onehot(ktrue[rows])], 1), rows
-    bt = BlockTransform(); P = presence(T, bt)
-    pres_metrics = {}
-    def fit_head(name, y, m):
-        Xa, ra = xh(tr & m); heads[name] = gbdt(Xa, y[ra], seed, max_iter=300); del Xa
-        Xb, rb = xh(te & m, cap=10**9); pres_metrics[name] = binary_metrics(y[rb], heads[name].predict_proba(Xb)[:, 1]); del Xb
-    for g in GROUPS:
-        fit_head(g, P[g].astype(int), matched)
-    for fl in FLAGS:
-        fit_head(fl, np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int), matched & P["two"])
-    for c, (test, _) in SPIKES.items():
-        v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
-        fit_head("spike_" + c, y, matched & ok & (P["two"] if c == "opening_angle" else True))
-    metrics["presence"] = pres_metrics
-    print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
-
-    # ---- flow over the standardised block ----------------------------------------------------------------------
+    curves = None
+    if range_curve:
+        curves = fit_range_curves(T[tr]); T = add_range_targets(T, curves)
+        metrics["range_on_curve_train"] = {k: float(np.nanmean(T.loc[tr, f"range_{k}_on"])) for k in RANGE_PAIRS}
+    bt = BlockTransform(SPEC + (WALL_SPEC if walls else []) + (RANGE_SPEC if range_curve else [])); P = presence(T, bt)
+    # ---- standardised block (needed by the topology head of topo_last models) ----------------------------------
     Y = bt.matrix(T).astype(np.float32); bt.fit(Y[tr & matched])
     Z, Mfin = bt.standardise(Y); del Y
     Mg = mask_from_presence(P, bt) * Mfin          # groups absent or values non-finite are masked
@@ -335,23 +443,69 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     for c, (test, _) in SPIKES.items():
         j = bt.cols.index(c); v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v)
         Mg[Sreal[c], j] = 0.0                      # point masses are not modelled by the flow
+
+    # topology: joint categorical over the PFP counts; sampled first (fed to every other component) or, topo_last,
+    # after the flow from the truth features and the generated block
+    topo = Topology(T, tr & matched); ktrue = topo.encode(T)
+    rng0 = np.random.default_rng(seed + 1)
+    def sub(mask, cap):
+        rows = np.flatnonzero(mask)
+        return np.sort(rng0.choice(rows, cap, replace=False)) if len(rows) > cap else rows
+    if topo_last:
+        rtr, rva, rte = sub(tr & matched, 1_500_000), sub(va & matched, 300_000), np.flatnonzero(te & matched)
+        tX = lambda r: topo_input(C[r], Z[r], Mg[r])
+        heads["topology"] = MLPClassifier(C.shape[1] + 2 * Z.shape[1], topo.other + 1, device=device, seed=seed).fit(tX(rtr), ktrue[rtr], tX(rva), ktrue[rva])
+        Pt = heads["topology"].predict_proba(tX(rte))
+    else:
+        heads["topology"] = MLPClassifier(C.shape[1], topo.other + 1, device=device, seed=seed).fit(C[tr & matched], ktrue[tr & matched], C[va & matched], ktrue[va & matched])
+        Pt = heads["topology"].predict_proba(C[te & matched])
+    metrics["topology"] = {"n_classes": topo.other + 1, "frac_other_train": float((ktrue[tr & matched] == topo.other).mean()), "topo_last": bool(topo_last),
+                           "logloss": float(-np.log(np.clip(Pt[np.arange(len(Pt)), ktrue[te & matched]], 1e-9, None)).mean()),
+                           "logloss_marginal": float(-np.log(np.clip(np.bincount(ktrue[tr & matched], minlength=topo.other + 1)[ktrue[te & matched]] / (tr & matched).sum(), 1e-9, None)).mean()),
+                           "accuracy": float((Pt.argmax(1) == ktrue[te & matched]).mean())}
+    print("topology:", {k: round(v, 4) for k, v in metrics["topology"].items()}, flush=True); del Pt
+    def xh(mask, cap=1_000_000, with_topo=True):
+        """features (+ topology one-hot) for the rows of `mask` (subsampled to `cap` rows): built on demand, never for all rows."""
+        rows = np.flatnonzero(mask)
+        if len(rows) > cap: rows = np.sort(np.random.default_rng(seed).choice(rows, cap, replace=False))
+        return (np.concatenate([X[rows], topo.onehot(ktrue[rows])], 1) if with_topo else X[rows]), rows
+    pres_metrics = {}
+    def fit_head(name, y, m, with_topo=True):
+        Xa, ra = xh(tr & m, with_topo=with_topo); heads[name] = gbdt(Xa, y[ra], seed, max_iter=300); del Xa
+        Xb, rb = xh(te & m, cap=10**9, with_topo=with_topo); pres_metrics[name] = binary_metrics(y[rb], heads[name].predict_proba(Xb)[:, 1]); del Xb
+    for g in GROUPS:
+        fit_head(g, P[g].astype(int), matched, with_topo=not topo_last)
+    for fl in FLAGS:
+        fit_head(fl, np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int), matched & P["two"])
+    for c, (test, _) in SPIKES.items():
+        v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
+        fit_head("spike_" + c, y, matched & ok & (P["two"] if c == "opening_angle" else True), with_topo=not topo_last)
+    metrics["presence"] = pres_metrics; mem("after heads")
+    print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
+
+    # ---- flow over the standardised block ----------------------------------------------------------------------
     model, hist = train_flow(Z[tr & matched], Mg[tr & matched], C[tr & matched], ktrue[tr & matched], Z[va & matched], Mg[va & matched], C[va & matched], ktrue[va & matched],
-                             topo.other + 1, epochs, device, hidden, n_layers, seed=seed)
+                             0 if topo_last else topo.other + 1, epochs, device, hidden, n_layers, seed=seed)
     metrics["flow_val_curve"] = hist
 
     # ---- closure on the test split: real vs generated slice blocks ---------------------------------------------
     tm = te & matched; idx = T.index[tm]
     rng = np.random.default_rng(seed)
-    Ptm = heads["topology"].predict_proba(C[tm])
-    kgen = (Ptm.cumsum(1) > rng.random(len(Ptm))[:, None]).argmax(1)
-    XHg = np.concatenate([X[tm], topo.onehot(kgen)], 1); CHg = np.concatenate([C[tm], topo.onehot(kgen)], 1)
-    Pg = {g: rng.random(int(tm.sum())) < heads[g].predict_proba(XHg)[:, 1] for g in GROUPS}
+    if topo_last:
+        Xpre, Cflow = X[tm], C[tm]
+    else:
+        Ptm = heads["topology"].predict_proba(C[tm]); kgen = (Ptm.cumsum(1) > rng.random(len(Ptm))[:, None]).argmax(1)
+        Xpre = np.concatenate([X[tm], topo.onehot(kgen)], 1); Cflow = np.concatenate([C[tm], topo.onehot(kgen)], 1)
+    Pg = {g: rng.random(int(tm.sum())) < heads[g].predict_proba(Xpre)[:, 1] for g in GROUPS}
     Mgen = mask_from_presence(Pg, bt)
     Sgen = {}
     for c, (test, value) in SPIKES.items():
-        j = bt.cols.index(c); p = heads["spike_" + c].predict_proba(XHg)[:, 1]
+        j = bt.cols.index(c); p = heads["spike_" + c].predict_proba(Xpre)[:, 1]
         Sgen[c] = (rng.random(len(p)) < p) & (Mgen[:, j] > 0); Mgen[Sgen[c], j] = 0.0
-    Zgen = sample_flow(model, CHg, Mgen, device)
+    Zgen = sample_flow(model, Cflow, Mgen, device)
+    if topo_last:
+        Ptm = heads["topology"].predict_proba(topo_input(C[tm], Zgen, Mgen)); kgen = (Ptm.cumsum(1) > rng.random(len(Ptm))[:, None]).argmax(1)
+    XHg = np.concatenate([X[tm], topo.onehot(kgen)], 1)
     gen = bt.frame(Zgen, Mgen, idx)
     real = bt.frame(Z[tm], Mg[tm], idx)           # same transform round trip for a fair comparison
     cnt_gen = topo.decode(kgen, rng); cnt_gen.index = idx
@@ -364,6 +518,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     for fl in FLAGS:
         p = heads[fl].predict_proba(XHg)[:, 1]; gen[fl] = np.where(Pg["two"], (rng.random(len(p)) < p).astype(float), np.nan)
         real[fl] = T[fl].to_numpy()[tm]
+    apply_walls(gen); apply_range(gen, curves)
+    for c in ("range_p_mu", "range_p_cpi", "long_trk_len", "muon_end_x", "muon_end_y", "muon_end_z", "cpi_end_x", "cpi_end_y", "cpi_end_z"):
+        real[c] = T[c].to_numpy()[tm]            # real values without the transform round trip (exact wall positions)
+    metrics["wall_closure_test"] = wall_closure(real, gen); print("wall closure:", metrics["wall_closure_test"], flush=True)
     metrics["topology_sampled_vs_true_test"] = {"frac_equal": float((kgen == ktrue[tm]).mean()),
                                                 "two_track_tuple_rate": {"real": float(((real.n_prong == 2) & (real.n_trk == 2) & (real.n_proton == 0) & (real.n_shower == 0)).mean()),
                                                                          "generated": float(((gen.n_prong == 2) & (gen.n_trk == 2) & (gen.n_proton == 0) & (gen.n_shower == 0)).mean())}}
@@ -392,10 +550,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         plots.hist_compare(ax, r, f, np.linspace(lo, hi, 70), f"{tf}({c})" if tf != "lin" else c, (plots.REAL_LABEL, "flow"))
     plots.save(fig, out / "figures" / "m2_marginals.png")
     gen.to_parquet(out / "generated_test.parquet"); real.to_parquet(out / "real_test.parquet")
-    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + topo.other + 1, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
-                "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": SPEC}, out / "model.pt")
+    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + (0 if topo_last else topo.other + 1), "topo_last": bool(topo_last), "range_curves": curves, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
+                "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": bt.spec}, out / "model.pt")
     import pickle
-    topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1], "n_classes": topo.other + 1}, out / "topology_head.pt")
+    topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1] + (2 * Z.shape[1] if topo_last else 0), "n_classes": topo.other + 1}, out / "topology_head.pt")
     pickle.dump(heads, open(out / "heads.pkl", "wb"))
     metrics["runtime_s"] = time.time() - t0
     (out / "metrics.json").write_text(json.dumps(metrics, indent=1, default=float))

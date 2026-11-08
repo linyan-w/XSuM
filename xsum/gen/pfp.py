@@ -8,14 +8,14 @@ import torch
 
 from ..data.pfpset_tf import PfpTransform
 from ..models.pfpflow import PfpFlow
-from ..prep.pfpset import FIELDS, N_MAX, NAMES
+from ..prep.pfpset import FIELDS, LAYOUT, N_MAX, NAMES, snap_walls, track_len
 from ..train.m2 import SPEC, TOPO_COLS, BlockTransform, MLPClassifier, mask_from_presence
 from ..train.m4 import N_EMPTY_MAX
 
 # generated field -> production pfp column
 PFP_COLS = {"trackScore": "trackScore", "dist_to_vertex": "dist_to_vertex", "is_primary": "parent_is_primary",
             "start_x": "trk_start_x", "start_y": "trk_start_y", "start_z": "trk_start_z", "dir_x": "trk_dir_x", "dir_y": "trk_dir_y", "dir_z": "trk_dir_z",
-            "trk_len": "trk_len", "rangeP_mu": "trk_rangeP_mu", "mcsP_mu": "trk_mcsP_mu", "chi2_mu": "chi2_mu", "chi2_pro": "chi2_pro",
+            "rangeP_mu": "trk_rangeP_mu", "mcsP_mu": "trk_mcsP_mu", "chi2_mu": "chi2_mu", "chi2_pro": "chi2_pro",
             "chi2_mu_new": "chi2_mu_new_I2", "chi2_pro_new": "chi2_pro_new_I2", "chi2_kaon": "chi2_kaon_I2", "chi2_pion": "chi2_pion_I2",
             "pida": "pida", "chi2_ndof": "chi2_ndof", "shw_energy": "shw_bestplane_energy", "shw_len": "shw_len", "shw_open_angle": "shw_open_angle",
             "shw_density": "shw_density", "shw_conversion_gap": "shw_conversion_gap", "shw_dEdx": "shw_bestplane_dEdx"}
@@ -24,7 +24,10 @@ PFP_COLS = {"trackScore": "trackScore", "dist_to_vertex": "dist_to_vertex", "is_
 class PfpSurrogate:
     def __init__(self, model_dir, device="cuda"):
         ck = torch.load(f"{model_dir}/model.pt", map_location=device, weights_only=False); self.device = device
-        self.flow = PfpFlow(ck["dim"], ck["cond_dim"], ck["d_model"], ck["n_layers"]).to(device); self.flow.load_state_dict(ck["state"]); self.flow.eval()
+        assert ck.get("layout", "v2") == LAYOUT, f"model trained with PFP layout {ck.get('layout', 'v2')}, code is {LAYOUT}: use the matching commit"
+        self.n_part_layers = ck.get("n_part_layers", 0)
+        self.geo = ck.get("geo", False)
+        self.flow = PfpFlow(ck["dim"], ck["cond_dim"], ck["d_model"], ck["n_layers"], n_part_layers=self.n_part_layers, geo=self.geo).to(device); self.flow.load_state_dict(ck["state"]); self.flow.eval()
         self.pt = PfpTransform(); self.pt.loc, self.pt.scale = ck["pt_loc"], ck["pt_scale"]
         self.std_m, self.std_s = ck["std_m"], ck["std_s"]
         self.bt = BlockTransform(); self.bt.med, self.bt.mad = ck["bt_med"], ck["bt_mad"]
@@ -44,22 +47,30 @@ class PfpSurrogate:
         return np.concatenate([C, H, Zc], 1).astype(np.float32)
 
     @torch.no_grad()
-    def generate(self, F, slc, seed=0, n_steps=64, bs=8192):
-        """-> pfp DataFrame (index: slc index + rec.slc.reco.pfp..index) and per-slice n_empty."""
+    def generate(self, F, slc, seed=0, n_steps=64, bs=8192, particles=None):
+        """particles: (cls [n,M] int, P [n,M,>=3] GeV[, G [n,M,9] int16 Geant4 geometry]) true particle tokens of the generating neutrinos (needed when the
+        model cross-attends to them). -> pfp DataFrame (index: slc index + rec.slc.reco.pfp..index) and per-slice n_empty."""
         rng = np.random.default_rng(seed); cond = self.cond(F, slc)
         Pn = self.n_fit.predict_proba(cond); nf = (Pn.cumsum(1) > rng.random(len(Pn))[:, None]).argmax(1)
         Pe = self.n_empty.predict_proba(cond); ne = (Pe.cumsum(1) > rng.random(len(Pe))[:, None]).argmax(1)
         pm = np.arange(N_MAX)[None, :] < nf[:, None]
-        Z = np.concatenate([self.flow.sample(torch.tensor(cond[i:i + bs], device=self.device), torch.tensor(pm[i:i + bs], device=self.device), n_steps=n_steps).cpu().numpy() for i in range(0, len(cond), bs)]) if len(cond) else np.zeros((0, N_MAX, len(FIELDS)), np.float32)
-        X = self.pt.inverse(Z, pm)
+        if self.n_part_layers: assert particles is not None, "this model needs the true particle tokens"
+        if self.geo: assert len(particles) == 3, "this model needs the Geant4 particle geometry (PrimStore(geo=True))"
+        def part(i):
+            if not self.n_part_layers: return None
+            out = (torch.tensor(particles[0][i:i + bs], device=self.device).long(), torch.tensor(np.ascontiguousarray(particles[1][i:i + bs, :, :3], dtype=np.float32), device=self.device))
+            return out + (torch.tensor(np.ascontiguousarray(particles[2][i:i + bs]), device=self.device),) if self.geo else out
+        Z = np.concatenate([self.flow.sample(torch.tensor(cond[i:i + bs], device=self.device), torch.tensor(pm[i:i + bs], device=self.device), n_steps=n_steps, part=part(i)).cpu().numpy() for i in range(0, len(cond), bs)]) if len(cond) else np.zeros((0, N_MAX, len(FIELDS)), np.float32)
+        X = snap_walls(self.pt.inverse(Z, pm))   # track ends flagged on the TPC wall placed on it
         rows, slots = np.nonzero(pm)
         out = {PFP_COLS[n]: X[rows, slots, NAMES.index(n)] for n in PFP_COLS}
+        out["trk_len"] = track_len(X)[rows, slots]
         out["parent_is_primary"] = np.rint(out["parent_is_primary"]).astype(np.int8)
         has_trk, has_shw = X[rows, slots, NAMES.index("has_trk")] > 0.5, X[rows, slots, NAMES.index("has_shw")] > 0.5
         for a in "xyz":   # shower start = the same generated start point
             out[f"shw_start_{a}"] = np.where(has_shw, out[f"trk_start_{a}"], np.nan)
             out[f"trk_start_{a}"] = np.where(has_trk, out[f"trk_start_{a}"], np.nan)
-            out[f"trk_end_{a}"] = np.where(has_trk, out[f"trk_start_{a}"] + out["trk_len"] * out[f"trk_dir_{a}"], np.nan)   # straight-track end point
+            out[f"trk_end_{a}"] = np.where(has_trk, out[f"trk_start_{a}"] + X[rows, slots, NAMES.index(f"disp_{a}")], np.nan)   # generated end point
         out["surrogate_slot"] = slots
         idx = pd.MultiIndex.from_arrays([slc.index.get_level_values(i)[rows] for i in range(slc.index.nlevels)] + [slots], names=list(slc.index.names) + ["rec.slc.reco.pfp..index"])
         return pd.DataFrame(out, index=idx), pd.Series(ne, index=slc.index, name="n_empty_pfp")

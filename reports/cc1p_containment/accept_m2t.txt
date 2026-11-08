@@ -1,0 +1,25 @@
+test neutrinos 179331
+
+PRIMARY signal: numu CC 1mu1p0pi, p_mu, p_p < 1 GeV, true vertex in FV; no end-point containment: 7686 true signal neutrinos
+stage                real sel    eff    pur | XSuM sel    eff    pur | XSuM/real sel overlap/real sig overlap
+allreco                 57559  0.953  0.127 |    57391  0.955  0.128 |         0.997        0.884       0.960
+vertex_in_fv            34578  0.935  0.208 |    34395  0.928  0.207 |         0.995        0.852       0.936
+nu_score                30496  0.867  0.218 |    30554  0.864  0.217 |         1.002        0.828       0.892
+2prong                  11624  0.671  0.444 |    11409  0.661  0.445 |         0.982        0.518       0.714
+2prong-contained         3500  0.198  0.435 |     3654  0.192  0.404 |         1.044        0.416       0.580
+2prong-trackscore        2636  0.186  0.543 |     2669  0.179  0.514 |         1.013        0.415       0.550
+2prong-vtxdist           1938  0.147  0.583 |     1851  0.138  0.573 |         0.955        0.357       0.469
+2prong-muX               1146  0.122  0.818 |     1058  0.113  0.818 |         0.923        0.334       0.391
+2prong-mup-PID            936  0.109  0.895 |      922  0.105  0.879 |         0.985        0.356       0.388
+
+Notebook signal: the same + true mu and p end points in the FV of the vertex's TPC: 2408 true signal neutrinos
+stage                real sel    eff    pur | XSuM sel    eff    pur | XSuM/real sel overlap/real sig overlap
+allreco                 57559  0.968  0.041 |    57391  0.974  0.041 |         0.997        0.884            
+vertex_in_fv            34578  0.963  0.067 |    34395  0.962  0.067 |         0.995        0.852            
+nu_score                30496  0.872  0.069 |    30554  0.871  0.069 |         1.002        0.828            
+2prong                  11624  0.637  0.132 |    11409  0.620  0.131 |         0.982        0.518            
+2prong-contained         3500  0.626  0.431 |     3654  0.535  0.352 |         1.044        0.416            
+2prong-trackscore        2636  0.589  0.538 |     2669  0.498  0.449 |         1.013        0.415            
+2prong-vtxdist           1938  0.465  0.578 |     1851  0.386  0.502 |         0.955        0.357            
+2prong-muX               1146  0.387  0.813 |     1058  0.315  0.717 |         0.923        0.334            
+2prong-mup-PID            936  0.346  0.890 |      922  0.295  0.771 |         0.985        0.356            

@@ -1,0 +1,34 @@
+Started /home/lwan/SBND/XSuM/.venv/bin/python scripts/run_m4.py data/prod_v10_14_02_03_official/table_matched_m3 data/prod_v10_14_02_03_official/pfpsets_v2 reports/abl_attn0 --epochs 15 --max-slices 1000000 --d-model 256.
+sets 1000002, table 5736854, aligned 1000002  (17 s)
+cond dim 309, train 799658 val 100205 test 100137  (31 s)
+n_fit {'logloss': 0.1771, 'logloss_marginal': 1.554, 'accuracy': 0.9318}
+n_empty {'logloss': 0.1219, 'logloss_marginal': 0.1928, 'accuracy': 0.9566}
+  x = np.asarray(x, dtype=np.float64)
+epoch   0 train 1.1237 val 0.9435
+epoch   1 train 0.9049 val 0.8765
+epoch   2 train 0.8580 val 0.8438
+epoch   3 train 0.8309 val 0.8235
+epoch   4 train 0.8132 val 0.8109
+epoch   5 train 0.8007 val 0.7947
+epoch   6 train 0.7900 val 0.7870
+epoch   7 train 0.7822 val 0.7761
+epoch   8 train 0.7721 val 0.7709
+epoch   9 train 0.7664 val 0.7678
+epoch  10 train 0.7597 val 0.7591
+epoch  11 train 0.7554 val 0.7548
+epoch  12 train 0.7501 val 0.7519
+epoch  13 train 0.7483 val 0.7470
+epoch  14 train 0.7463 val 0.7502
+end point (longest track, same test slices): |gen-real| median 15.3 cm (straight line 13.0), >10 cm 0.63; lateral real 7.9 gen 9.0; end in FV real 0.4973 gen 0.4703 (straight line 0.4895); wall distance <-3/+-3/3-10/10-20/>20: real [0.002, 0.349, 0.088, 0.074, 0.487] gen [0.041, 0.355, 0.077, 0.066, 0.461] line [0.118, 0.209, 0.114, 0.085, 0.474]
+  CC Npi        2prong real 0.0909 gen 0.0917; contained/2prong real 0.300 gen 0.282 (2prong in both: 0.289 / 0.271)
+  CC 0pi 1p     2prong real 0.3450 gen 0.3435; contained/2prong real 0.242 gen 0.234 (2prong in both: 0.238 / 0.230)
+  CC 0pi other  2prong real 0.1461 gen 0.1496; contained/2prong real 0.295 gen 0.285 (2prong in both: 0.287 / 0.275)
+  NC            2prong real 0.2211 gen 0.2175; contained/2prong real 0.675 gen 0.630 (2prong in both: 0.684 / 0.634)
+  CC Npi        n= 15525 end in FV real 0.4819 gen 0.4478; on wall real 0.3582 gen 0.3612
+  CC 0pi 1p     n= 39998 end in FV real 0.4459 gen 0.4297; on wall real 0.4106 gen 0.4055
+  CC 0pi other  n= 28898 end in FV real 0.4665 gen 0.4412; on wall real 0.3909 gen 0.3916
+  NC            n= 15070 end in FV real 0.7052 gen 0.6545; on wall real 0.1027 gen 0.1538
+n_fit real/gen mean: 2.344 2.347  two-track rate real/gen/slc: 0.0795 0.0838 0.0795
+W1: {'dist_to_vertex': 0.027, 'trackScore': 0.004, 'start_x': 0.803, 'start_y': 1.249, 'start_z': 1.054, 'dir_x': 0.004, 'dir_y': 0.005, 'dir_z': 0.005, 'len_excess': 0.013, 'rangeP_mu': 0.006, 'mcsP_mu': 0.029, 'chi2_mu': 0.017, 'chi2_pro': 0.017, 'chi2_mu_new': 0.017, 'chi2_pro_new': 0.012, 'chi2_kaon': 0.016, 'chi2_pion': 0.014, 'pida': 0.02, 'chi2_ndof': 0.031, 'shw_energy': 0.011, 'shw_len': 0.016, 'shw_open_angle': 0.004, 'shw_density': 0.007, 'shw_conversion_gap': 0.028, 'shw_dEdx': 0.031, 'disp_x': 0.017, 'disp_y': 0.023, 'disp_z': 0.012, 'wall_off_x': 0.021, 'wall_off_y': 0.246, 'wall_off_z': 0.021}
+done in 428 s -> reports/abl_attn0
+xsum-m4sel.service: Consumed 7min 55.137s CPU time, 1.4M memory peak.

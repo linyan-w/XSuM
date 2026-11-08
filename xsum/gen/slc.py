@@ -14,7 +14,7 @@ import torch
 
 from ..models.flow import FlowMatcher
 from ..train.m2 import (BlockTransform, FLAGS, GROUPS, MLPClassifier, SPIKES, SPEC, TOPO_COLS, Topology,
-                        mask_from_presence, sample_flow)
+                        apply_range, apply_walls, mask_from_presence, sample_flow, topo_input)
 
 
 class Surrogate:
@@ -32,6 +32,7 @@ class Surrogate:
         self.topo = Topology.__new__(Topology)
         self.topo.classes = [tuple(c) for c in ck["topology_classes"]]; self.topo.lookup = {t: i for i, t in enumerate(self.topo.classes)}
         self.topo.other = len(self.topo.classes)
+        self.topo_last, self.range_curves = bool(ck.get("topo_last", False)), ck.get("range_curves")
         self.topo.other_pool = np.asarray(ck.get("topology_other_pool", np.array([self.topo.classes[-1]], dtype=float)), dtype=float)
 
     def standardise(self, X):
@@ -51,16 +52,21 @@ def generate(sur: Surrogate, F: pd.DataFrame, seed: int = 0, cardinality: bool =
     if len(rows) == 0:
         return pd.DataFrame()
     Xr = X[rows]; C = sur.standardise(Xr); Fr = F.iloc[rows]
-    Pt = sur.topo_head.predict_proba(C)
-    k = (Pt.cumsum(1) > rng.random(len(Pt))[:, None]).argmax(1)
-    H = sur.topo.onehot(k); XH = np.concatenate([Xr, H], 1); CH = np.concatenate([C, H], 1)
-    P = {g: rng.random(len(Xr)) < sur.heads[g].predict_proba(XH)[:, 1] for g in GROUPS}
+    if sur.topo_last:                 # topology sampled after the flow, from the truth features and the generated block
+        Xpre, Cflow = Xr, C
+    else:
+        Pt = sur.topo_head.predict_proba(C); k = (Pt.cumsum(1) > rng.random(len(Pt))[:, None]).argmax(1)
+        H = sur.topo.onehot(k); Xpre = np.concatenate([Xr, H], 1); Cflow = np.concatenate([C, H], 1)
+    P = {g: rng.random(len(Xr)) < sur.heads[g].predict_proba(Xpre)[:, 1] for g in GROUPS}
     M = mask_from_presence(P, sur.bt)
     S = {}
     for c, (test, value) in SPIKES.items():
-        j = sur.bt.cols.index(c); p = sur.heads["spike_" + c].predict_proba(XH)[:, 1]
+        j = sur.bt.cols.index(c); p = sur.heads["spike_" + c].predict_proba(Xpre)[:, 1]
         S[c] = (rng.random(len(p)) < p) & (M[:, j] > 0); M[S[c], j] = 0.0
-    Z = sample_flow(sur.flow, CH, M, sur.device, n_steps=n_steps)
+    Z = sample_flow(sur.flow, Cflow, M, sur.device, n_steps=n_steps)
+    if sur.topo_last:
+        Pt = sur.topo_head.predict_proba(topo_input(C, Z, M)); k = (Pt.cumsum(1) > rng.random(len(Pt))[:, None]).argmax(1)
+    XH = np.concatenate([Xr, sur.topo.onehot(k)], 1)
     idx = pd.MultiIndex.from_arrays([F.index.get_level_values(i)[rows] for i in range(F.index.nlevels)] + [draw], names=list(F.index.names) + ["draw"])
     out = sur.bt.frame(Z, M, idx)
     cnt = sur.topo.decode(k, rng); cnt.index = idx
@@ -70,6 +76,8 @@ def generate(sur: Surrogate, F: pd.DataFrame, seed: int = 0, cardinality: bool =
         out.loc[S[c], c] = value(Fr)[S[c]]
     for fl in FLAGS:
         p = sur.heads[fl].predict_proba(XH)[:, 1]; out[fl] = np.where(P["two"], (rng.random(len(p)) < p).astype(float), np.nan)
+    apply_walls(out)   # no-op for models without the wall targets
+    apply_range(out, sur.range_curves)   # no-op for models without the range flags
     out["topology_class"] = k
     return out
 

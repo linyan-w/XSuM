@@ -14,9 +14,9 @@ from ..prep.pfpset import FIELDS, NAMES
 FLAG = [i for i, f in enumerate(FIELDS) if f[2] == "flag"]
 EDGE = 1 - 1e-5
 # which flag governs which fields (NaN pattern); None = always present for a fitted PFP
-GOVERNOR = {"mcsP_mu": "has_mcs"}
+GOVERNOR = {"mcsP_mu": "has_mcs", "wall_off_x": "wall_x", "wall_off_y": "wall_y", "wall_off_z": "wall_z"}
 GOVERNOR.update({n: "has_shw" for n in NAMES if n.startswith("shw_")})
-GOVERNOR.update({n: "has_trk" for n in ("dir_x", "dir_y", "dir_z", "trk_len", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_mu_new", "chi2_pro_new", "chi2_kaon", "chi2_pion", "pida", "chi2_ndof")})
+GOVERNOR.update({n: "has_trk" for n in ("disp_x", "disp_y", "disp_z", "dir_x", "dir_y", "dir_z", "len_excess", "rangeP_mu", "chi2_mu", "chi2_pro", "chi2_mu_new", "chi2_pro_new", "chi2_kaon", "chi2_pion", "pida", "chi2_ndof")})
 
 
 def _dequant(flag, rng):
@@ -29,6 +29,8 @@ def fwd(x, tf):
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
     if tf == "unit": return np.arctanh(np.clip(2 * x - 1, -EDGE, EDGE))
+    if tf == "logp01": return np.log(np.where(x >= 0, x, np.nan) + 0.1)
+    if tf.startswith("asinh"): return np.arcsinh(x / float(tf[5:]))
     return x
 
 
@@ -36,6 +38,8 @@ def inv(y, tf):
     if tf == "log": return np.exp(y)
     if tf == "log1p": return np.maximum(np.expm1(y), 0.0)
     if tf == "unit": return 0.5 * (np.tanh(y) + 1)
+    if tf == "logp01": return np.maximum(np.exp(y) - 0.1, 0.0)
+    if tf.startswith("asinh"): return float(tf[5:]) * np.sinh(y)
     return y
 
 
@@ -63,10 +67,11 @@ class PfpTransform:
             self.loc[j] = np.median(v); self.scale[j] = 1.4826 * np.median(np.abs(v - self.loc[j])) + 1e-6
         return self
 
-    def forward(self, X, rng, chunk=200_000):
+    def forward(self, X, rng, chunk=200_000, inplace=False):
         """-> Z [n, N, D] float32 (noise where absent or padded), valid [n, N] bool. Chunked: float64 temporaries
-        exist only for `chunk` slices at a time."""
-        Z = np.empty(X.shape, dtype=np.float32); valid = ~np.isnan(X[..., 0])
+        exist only for `chunk` slices at a time. inplace=True overwrites X (float32) with Z to save memory."""
+        valid = ~np.isnan(X[..., 0])
+        Z = X if (inplace and X.dtype == np.float32) else np.empty(X.shape, dtype=np.float32)
         for i in range(0, len(X), chunk):
             U = (self._unscaled(X[i:i + chunk], rng) - self.loc) / self.scale
             z = np.where(np.isfinite(U), U, rng.standard_normal(U.shape)); del U

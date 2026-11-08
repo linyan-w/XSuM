@@ -1,0 +1,105 @@
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+/home/lwan/SBND/XSuM/scripts/diag_cc1p_summary.py:12: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  D[c] = D[c].fillna(False).astype(bool)
+neutrinos at nu_score in either sample: 35982; true signal 2330
+
+A. 2prong -> contained, each sample on its own 2prong population, by truth category
+category                     real 2pr   cont   frac | XSuM 2pr   cont   frac
+signal (truth-contained)         1535   1508  0.982 |     1472   1301  0.884
+NC (bkg)                         1327    853  0.643 |     1377    875  0.635
+nue CC (bkg)                       61     27  0.443 |       57     17  0.298
+numu CC 1p0pi (any cont.) (bkg)     5664     90  0.016 |     5701    377  0.066
+numu CC Npi (bkg)                 759    207  0.273 |      799    295  0.369
+numu CC other 0pi (bkg)          2278    815  0.358 |     2237    900  0.402
+
+B. neutrinos at 2prong in BOTH samples: 6096 (signal 1029); pass rate of each condition and per-event agreement
+  signal
+    condition      real   XSuM  agree  real only XSuM only
+    c_vtx         1.000  1.000  1.000      0.000     0.000
+    c_t1_start    1.000  1.000  1.000      0.000     0.000
+    c_t1_end      0.992  0.948  0.942      0.052     0.007
+    c_t2_start    0.999  0.999  0.998      0.001     0.001
+    c_t2_end      0.997  0.988  0.989      0.010     0.001
+    c_side        0.997  0.960  0.961      0.038     0.001
+    contained     0.987  0.897  0.894      0.098     0.008
+  background
+    condition      real   XSuM  agree  real only XSuM only
+    c_vtx         1.000  1.000  1.000      0.000     0.000
+    c_t1_start    0.998  0.995  0.994      0.004     0.002
+    c_t1_end      0.320  0.349  0.918      0.026     0.056
+    c_t2_start    0.992  0.994  0.989      0.005     0.007
+    c_t2_end      0.898  0.903  0.955      0.020     0.025
+    c_side        0.706  0.708  0.959      0.020     0.021
+    contained     0.126  0.160  0.928      0.019     0.053
+
+C. per-event real-vs-XSuM agreement of the two longest tracks (neutrinos at 2prong in both)
+    quantity          t1 corr  t2 corr
+    trk_len             0.933    0.778
+    trk_dir_x           0.872    0.841
+    trk_dir_y           0.829    0.746
+    trk_dir_z           0.722    0.561
+    trk_start_x         0.995    0.995
+    trk_start_y         0.994    0.994
+    trk_start_z         0.990    0.990
+    trk_end_x           0.981    0.989
+    trk_end_y           0.975    0.987
+    trk_end_z           0.968    0.982
+    t1: same sign of dir_x 0.914, of dir_y 0.895
+    t2: same sign of dir_x 0.872, of dir_y 0.844
+    r: |end_x - (start_x + len*dir_x)| median 3.9 cm, 90% 18.5 cm
+    s: |end_x - (start_x + len*dir_x)| median 0.0 cm, 90% 0.0 cm
+
+D. length distributions of the two tracks at 2prong (each sample's own population), quantiles 25/50/75/90 [cm]
+    signal     t1: real [ 84.7 120.2 179.  251.7]  XSuM [ 86.3 126.4 181.3 247.2]
+    signal     t2: real [ 5.2 11.5 25.2 43.1]  XSuM [ 5.3 10.9 22.7 42. ]
+    background t1: real [ 63.1 117.9 200.5 292.6]  XSuM [ 62.7 117.6 198.8 292. ]
+    background t2: real [ 4.9 11.7 26.6 51.5]  XSuM [ 5.  11.5 26.7 52.2]
+
+E. truth-contained signal at 2prong in both: which condition fails (fraction of these neutrinos)
+    fail c_vtx        real 0.000  XSuM 0.000
+    fail c_t1_start   real 0.000  XSuM 0.000
+    fail c_t1_end     real 0.008  XSuM 0.052
+    fail c_t2_start   real 0.001  XSuM 0.001
+    fail c_t2_end     real 0.003  XSuM 0.012
+    fail c_side       real 0.003  XSuM 0.040
+
+F. real tracks, true end points vs straight-line end points (start + len*dir), 2prong -> contained
+   signal                           n  1535  real ends 0.982  straight-line ends 0.924   (XSuM 0.884)
+   NC (bkg)                         n  1327  real ends 0.643  straight-line ends 0.595   (XSuM 0.635)
+   nue CC (bkg)                     n    61  real ends 0.443  straight-line ends 0.311   (XSuM 0.298)
+   numu CC 1p0pi (any cont.) (bkg)  n  5664  real ends 0.016  straight-line ends 0.038   (XSuM 0.066)
+   numu CC Npi (bkg)                n   759  real ends 0.273  straight-line ends 0.277   (XSuM 0.369)
+   numu CC other 0pi (bkg)          n  2278  real ends 0.358  straight-line ends 0.362   (XSuM 0.402)
