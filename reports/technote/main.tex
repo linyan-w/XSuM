@@ -455,7 +455,22 @@ end in FV / outside) 0.107 / 0.135 against \real{} 0.108 / 0.135) and loses it o
 reduces the link most for the short-track group (from +0.028 to +0.016, mostly through whether a short track exists),
 less for the two-track group, the direction and the length; no single group restores it. The link is carried
 jointly by the longest track, the presence of the optional groups and the PFP counts, which M2 samples in separate
-pieces. Neither study is shipped; the shipped M2 is unchanged.
+pieces.
+
+\paragraph{M2s: two-stage M2.} Stage 1 is one flow over the always-present variables, the five PFP counts
+(dequantised integers) and the group-presence flags; stage 2 is a flow over the optional groups, conditioned on the
+truth and the stage-1 output and masked by the generated presence. The hard relations of the \real{} reconstruction
+(counts nested, a short track whenever $n_\mathrm{trk}\ge2$, the two-track block only for $n_\mathrm{prong}=n_\mathrm{trk}=2$)
+are enforced after stage 1; they correct 0.03--0.9\% of the slices. The targeted link closes: CC N$\pi$ at
+$n_\mathrm{pfp}=3$, longest track ending in the FV 0.442 against \real{} 0.439, and the pion range momentum lies on the
+length curve for 93\% of the slices (\real{} 93\%). The chain loses 2prong events, however: efficiency 0.165 and
+purity 0.396 at 2prong-contained (\real{} 0.198 / 0.435), P(PFP 2prong | slice $n_\mathrm{pfp}=3$) 0.85 against
+0.97 for signal. The dequantised counts do not keep the joint count lattice: 17\% of the generated slices carry a
+($n_\mathrm{pfp}, n_\mathrm{prong}, n_\mathrm{trk}, n_\mathrm{proton}, n_\mathrm{shower}$) tuple that \real{} slices
+do not populate, and the (3, 2, 2, $\cdot$, 0) tuples are 0.341 of $n_\mathrm{pfp}=3$ against 0.439, so M4 builds
+fewer two-track sets. A variant with the counts entering stage 1 as the topology class (a dequantised one-hot,
+decoded by argmax; \texttt{--topo-onehot}, pipeline M2o) is being trained. None of these studies is shipped; the
+shipped M2 is unchanged.
 
 \begin{table}[h]\centering\small
 \begin{tabular}{lccc}\toprule
@@ -522,16 +537,16 @@ after review.
 Done so far: the official sample, M1 baselines, M2 (slice block), M3 (particle-set encoder, stage A), M4 (PFP set, generated track ends on the wall),
 and production-format surrogated datasets for the analysers. Remaining:
 \begin{enumerate}
-\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): a two-stage M2, with one flow over the always-present
-      variables (vertex, scores, longest track), the PFP counts and the group-presence flags, and a second flow
-      for the optional groups conditioned on it and masked by the generated presence.
+\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): the two-stage M2 (M2s) closes the CC N$\pi$
+      $n_\mathrm{pfp}$--exit link but breaks the joint PFP counts; the version with the counts as a one-hot
+      topology class in stage 1 (M2o) is in training.
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and
       M2 generate them as independent numbers and smear the sharp range peak of stopping pions
       (Fig.~\ref{fig:m1two}; M2 peak fraction 0.17 against 0.22). M2t flags them on the curve and snaps them, but
-      reaches only 72\% on the curve for the pion; to be carried into the two-stage M2, with the M2 version of
-      that figure.
+      reaches only 72\% on the curve for the pion; the two-stage M2s reaches 93\% (\real{} 93\%). To be
+      shipped with the next M2, with the M2 version of that figure.
 \item M4 completeness: induction-plane chi2, PFPs without a fit, PFP truth-match columns.
 \item Cosmic-only and unmatched slices in the surrogated files (taken from the MC).
 \item Uncertainty: Bayesian last layers or ensembles, an out-of-support flag per generated record.
