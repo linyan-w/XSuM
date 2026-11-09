@@ -214,3 +214,24 @@ Re-reading M2s: at the M2 level (test slices, truth CC + pion, vertex in FV, nu_
 track ends in the FV for 0.486 (M2w 0.483, M2o 0.521, M2c 0.480; real 0.446). M2s's chain value 0.442 was therefore
 not a closed link but the distorted n_pfp=3 population (P(2prong | n_pfp=3) 0.73 for CC Npi). No variant has
 reproduced the real correlation between the longest-track exit and the PFP count.
+
+## Where the exit <-> n_pfp link comes from (`scripts/diag_m2_link.py`, `scripts/diag_m2_link_head.py`; `link_m2c.txt`, `link_m3.txt`, `link_head_m3.txt`), 2026-11-09
+
+M2 test slices, truth CC + charged pion, vertex in FV, nu_score > 0.45 (24.5k); exit = longest track ends outside the FV.
+- The link is a truth-level effect, not a reconstruction-internal one: a GBDT P(n_pfp=3 | 80 truth features) gains
+  nothing from adding the reco exit (logloss 0.2985 -> 0.2984, exit effect given truth +0.005; raw link +0.026).
+  Split by the Geant4 containment of the leading muon (reference only) the link vanishes within each half
+  (-0.006 / -0.003). Within bins of any single truth variable it survives (+0.02), so it is a joint dependence.
+- The generated exit decision is right: agreement with the Geant4 muon 0.800 (real 0.809), P(exit | p_mu) matches
+  in every bin, per-event agreement with the real exit 0.83.
+- What the generators miss is P(n_pfp=3 | truth) in one kinematic region. With the exit predicted from the truth
+  alone (GBDT, AUC 0.88) the real link is +0.035-0.040, the generated one +0.018 (shipped), -0.003 (M2c). In
+  (p_mu, cos theta_mu) terciles: real / generated / shipped head probability at mid p_mu & forward 0.172 / 0.129 /
+  0.144, high p_mu & forward 0.138 / 0.121 / 0.115, high p_mu & not forward 0.067 / 0.096 / 0.080. By truth-predicted
+  exit probability: at 0.62-0.90 real 0.164, generated 0.127, head 0.127.
+- So the topology classifier (softmax MLP 3 x 256, 15 epochs, truth + z) underfits a joint dependence of the PFP
+  count on the muon kinematics; its binary n_pfp=3 logloss (0.288) is better than an 80-feature GBDT (0.2985), so the
+  z embedding carries information, but the region above is 20-30% low. Every variant inherited this (M2s, M2o drew
+  the counts from a flow on the same inputs; M2c's classifier read the generated block, which adds nothing beyond
+  the truth). Candidate fix without retraining the flows: a stronger topology head on the same inputs (the shipped
+  flow is conditioned on the class index, which is fixed by the training split), checked on the cells above.

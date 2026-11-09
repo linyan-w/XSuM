@@ -1,0 +1,44 @@
+1. link P(n_pfp=3 | exit) - P(n_pfp=3 | contained), truth CC + pion, vertex in FV, nu_score > 0.45
+   real  link +0.026   P(n3|exit) 0.134 (12205)   P(n3|cont) 0.108 (12302)   P(exit) 0.498   P(n3) 0.121
+   gen   link +0.017   P(n3|exit) 0.134 (12032)   P(n3|cont) 0.117 (12733)   P(exit) 0.486   P(n3) 0.125
+
+2. real link inside bins of one truth variable (weighted mean of the within-bin links): the part not explained by it   [real | gen]
+   lead_p_mu      within-bin link real +0.022 | gen +0.004
+   lead_cosz_mu   within-bin link real +0.016 | gen +0.005
+   lead_pt_mu     within-bin link real +0.040 | gen +0.027
+   vtx_z          within-bin link real +0.023 | gen +0.016
+   dist_back      within-bin link real +0.023 | gen +0.016
+   dist_wall_x    within-bin link real +0.022 | gen +0.013
+   dist_wall_y    within-bin link real +0.024 | gen +0.014
+   n_charged      within-bin link real +0.025 | gen +0.015
+   sumke_visible  within-bin link real +0.053 | gen +0.037
+   lead_p_pi      within-bin link real +0.028 | gen +0.018
+   n_p            within-bin link real +0.023 | gen +0.013
+   n_pi           within-bin link real +0.029 | gen +0.020
+   sumke_pi       within-bin link real +0.028 | gen +0.019
+   sum_pz         within-bin link real +0.045 | gen +0.030
+
+3. GBDT P(n_pfp=3 | truth [+ reco exit]) on the selection, half for training; the exit effect = mean P(.., exit=1) - P(.., exit=0)
+   real  logloss truth 0.2985  truth+exit 0.2984   exit effect given truth +0.005   raw link +0.026
+   gen   logloss truth 0.3072  truth+exit 0.3074   exit effect given truth +0.010   raw link +0.017
+
+4. per-event exit decision (selection by the real frame)
+   P(gen exit | real exit) 0.822   P(gen exit | real contained) 0.154   agreement 0.834   P(real exit) 0.487  P(gen exit) 0.479
+   Geant4 leading muon known for 21756 of 21756: P(true exit) 0.417
+   real  P(reco exit | true exit) 0.855   P(reco exit | true contained) 0.224   agreement with Geant4 0.809
+   gen   P(reco exit | true exit) 0.835   P(reco exit | true contained) 0.225   agreement with Geant4 0.800
+   real link split by the Geant4 muon:  true exit  / true contained
+   real  link | true exit -0.006 (n 7754/1316)   link | true contained -0.003 (n 2840/9846)   P(n3 | true exit) 0.103  P(n3 | true cont) 0.091
+   gen   link | true exit -0.011 (n 7569/1501)   link | true contained +0.001 (n 2850/9836)   P(n3 | true exit) 0.102  P(n3 | true cont) 0.095
+   P(exit | lead_p_mu bin) and P(n_pfp=3 | lead_p_mu bin)   [real | gen]
+      p_mu 0.08-0.22  exit 0.218 | 0.210   n3 0.117 | 0.116   n 3626
+      p_mu 0.22-0.32  exit 0.246 | 0.235   n3 0.094 | 0.095   n 3626
+      p_mu 0.32-0.45  exit 0.341 | 0.342   n3 0.091 | 0.091   n 3626
+      p_mu 0.45-0.63  exit 0.500 | 0.498   n3 0.089 | 0.096   n 3626
+      p_mu 0.63-1.01  exit 0.707 | 0.695   n3 0.108 | 0.111   n 3626
+      p_mu 1.01-5.72  exit 0.910 | 0.894   n3 0.078 | 0.077   n 3626
+
+5. link with the exit predicted from truth alone (GBDT on the real exit, half for training), applied to real and generated n_pfp
+   AUC of the truth-predicted exit vs real exit 0.883, vs gen exit 0.871; accuracy at 0.5: real 0.796 gen 0.776
+   real  link with the truth-predicted exit +0.038   with its own reco exit +0.033
+   gen   link with the truth-predicted exit -0.003   with its own reco exit -0.004
