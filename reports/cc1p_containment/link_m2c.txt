@@ -42,3 +42,20 @@
    AUC of the truth-predicted exit vs real exit 0.883, vs gen exit 0.871; accuracy at 0.5: real 0.796 gen 0.776
    real  link with the truth-predicted exit +0.038   with its own reco exit +0.033
    gen   link with the truth-predicted exit -0.003   with its own reco exit -0.004
+
+6. inside the bins of the truth-predicted exit probability: P(n_pfp=3 | bin, reco exit / contained) and by the Geant4 muon   [real | gen]
+   P(exit) 0.01-0.12  real 0.099/0.097 (link +0.002) | gen 0.116/0.103 (link +0.012) | Geant4 exit/cont real 0.098/0.093 gen 0.049/0.105
+   P(exit) 0.12-0.34  real 0.117/0.077 (link +0.039) | gen 0.095/0.094 (link +0.001) | Geant4 exit/cont real 0.098/0.076 gen 0.095/0.094
+   P(exit) 0.34-0.61  real 0.168/0.114 (link +0.053) | gen 0.109/0.092 (link +0.017) | Geant4 exit/cont real 0.111/0.076 gen 0.125/0.085
+   P(exit) 0.61-0.90  real 0.176/0.178 (link -0.002) | gen 0.088/0.116 (link -0.027) | Geant4 exit/cont real 0.123/0.090 gen 0.099/0.089
+   P(exit) 0.90-0.99  real 0.095/0.093 (link +0.002) | gen 0.093/0.078 (link +0.016) | Geant4 exit/cont real 0.090/0.070 gen 0.093/0.070
+   check: P(n_pfp=3) real over the half-sample selection, with the gen selection too, with the Geant4 muon known: 0.119  0.091  0.091 | rows 12254 10852 10852 | P(n3) of gen-selected-only rows 0.335
+
+7. the link with weaker selections (each sample its own population): is the deficit in the counts or in the nu_score / vertex selection?
+   CC + pion, longest track present   real n 46435 P(n3) 0.178 P(exit) 0.524 link +0.005 [P(n3|exit) 0.180 P(n3|cont) 0.175] | gen n 46497 P(n3) 0.183 P(exit) 0.511 link +0.013 [P(n3|exit) 0.189 P(n3|cont) 0.176]
+   + vertex in FV                     real n 25892 P(n3) 0.132 P(exit) 0.494 link +0.026 [P(n3|exit) 0.146 P(n3|cont) 0.119] | gen n 26239 P(n3) 0.137 P(exit) 0.479 link +0.014 [P(n3|exit) 0.144 P(n3|cont) 0.130]
+   + nu_score > 0.45                  real n 24507 P(n3) 0.121 P(exit) 0.498 link +0.026 [P(n3|exit) 0.134 P(n3|cont) 0.108] | gen n 24765 P(n3) 0.125 P(exit) 0.486 link +0.017 [P(n3|exit) 0.134 P(n3|cont) 0.117]
+   + nu_score > 0.45, n_pfp <= 4      real n 9733 P(n3) 0.305 P(exit) 0.512 link +0.049 [P(n3|exit) 0.329 P(n3|cont) 0.280] | gen n 10010 P(n3) 0.309 P(exit) 0.493 link +0.034 [P(n3|exit) 0.326 P(n3|cont) 0.292]
+   P(nu_score > 0.45 | n_pfp=3, exit / contained) and P(vertex in FV | n_pfp=3, exit / contained), CC + pion with a longest track   [real | gen]
+   real  nu_score pass | exit 0.805  cont 0.859    FV | exit 0.426  cont 0.404    n3 events 8243
+   gen   nu_score pass | exit 0.819  cont 0.854    FV | exit 0.403  cont 0.444    n3 events 8492

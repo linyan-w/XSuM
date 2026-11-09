@@ -235,3 +235,25 @@ M2 test slices, truth CC + charged pion, vertex in FV, nu_score > 0.45 (24.5k); 
   the counts from a flow on the same inputs; M2c's classifier read the generated block, which adds nothing beyond
   the truth). Candidate fix without retraining the flows: a stronger topology head on the same inputs (the shipped
   flow is conditioned on the class index, which is fixed by the training split), checked on the cells above.
+
+## The link is the vertex-in-FV cut; the generated reco vertex is smeared 10x too much (`link_m3.txt` sections 6-8, `link_angles_m3.txt`, `m2_official_m3h.log`), 2026-11-09
+
+Two negative results first. (a) A topology head with 4x the capacity and 40 epochs (`scripts/retrain_topo_head.py`,
+evaluated on the shipped test files) does not recover the region: P(n_pfp=3 | truth-predicted exit 0.61-0.90) real
+0.184, shipped head 0.143, new head 0.149; multi-class logloss 2.1436 vs 2.1415. (b) Adding the angles between the
+muon and the other charged primaries from the particle set to an 80-feature GBDT (`scripts/diag_m2_link_angles.py`)
+does not either (0.164 real, 0.145 -> 0.144). Collinear mu-pi pairs do have more n_pfp=3 (0.199 at cos > 0.97) but
+are 5% of the events.
+
+Then the selection: without the vertex-in-FV cut the real link is gone (+0.005; generated +0.014). It appears with
+the cut on the RECO vertex (+0.026 real, +0.010 generated) and does not change with nu_score. Among n_pfp=3 CC + pion
+slices whose TRUE vertex is in the FV, the reco vertex passes the FV for 0.975 of exiting and 0.958 of contained
+slices in real, 0.932 and 0.968 in the generated ones (sign reversed). The reco-true vertex displacement is the
+cause: real median 0.4-0.6 cm, P(> 5 cm) 0.08 (exit) / 0.13 (contained) for all CC + pion slices; generated median
+4-6 cm, P(> 5 cm) 0.30 / 0.36. The tails (> 20, > 50 cm) match. Exiting-muon slices have true vertices nearer the
+downstream and side walls, so a 4 cm smear pushes them out of |x| < 190, z < 450 (0.980 / 0.978 vs real 0.997 / 0.993)
+while real keeps them in; contained slices with a badly misplaced vertex (real P(> 20 cm) 0.205) fall out in both.
+So the exit <-> n_pfp link of the acceptance study is a property of the reco vertex resolution, not of the PFP counts,
+and the generator's vertex core is 10x too wide. The vertex columns are generated as absolute positions with a
+robust linear scaling, so a 0.5 cm core next to a 10-cm-scale distribution of misplacements is invisible to the flow.
+Fix: generate the vertex as the residual to the true vertex with an asinh scale of ~1 cm (and keep the wall spikes).

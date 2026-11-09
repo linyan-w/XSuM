@@ -119,3 +119,54 @@ print(f"   AUC of the truth-predicted exit vs real exit {roc_auc_score(EX['real'
 sel = np.zeros(len(R), bool); sel[te] = True
 for p in ("real", "gen"):
     l = link(N3[p], pred, sel & S[p]); print(f"   {p:5s} link with the truth-predicted exit {l[0]:+.3f}   with its own reco exit {link(N3[p], EX[p], sel & S[p])[0]:+.3f}")
+
+print("\n6. inside the bins of the truth-predicted exit probability: P(n_pfp=3 | bin, reco exit / contained) and by the Geant4 muon   [real | gen]")
+q = np.quantile(pe[sel & S["real"]], np.linspace(0, 1, 6))
+for k in range(5):
+    b = sel & (pe >= q[k]) & (pe <= q[k + 1]); row = []
+    for p in ("real", "gen"):
+        mb = b & S[p]; row.append(f"{N3[p][mb & EX[p]].mean():.3f}/{N3[p][mb & ~EX[p]].mean():.3f} (link {N3[p][mb & EX[p]].mean() - N3[p][mb & ~EX[p]].mean():+.3f})")
+    mb = b & S["real"] & tm
+    row.append(f"Geant4 exit/cont real {N3['real'][mb & true_exit].mean():.3f}/{N3['real'][mb & ~true_exit].mean():.3f} gen {N3['gen'][mb & true_exit].mean():.3f}/{N3['gen'][mb & ~true_exit].mean():.3f}")
+    print(f"   P(exit) {q[k]:.2f}-{q[k+1]:.2f}  real {row[0]} | gen {row[1]} | {row[2]}")
+print("   check: P(n_pfp=3) real over the half-sample selection, with the gen selection too, with the Geant4 muon known:",
+      f"{N3['real'][sel & S['real']].mean():.3f}  {N3['real'][sel & S['real'] & S['gen']].mean():.3f}  {N3['real'][sel & S['real'] & S['gen'] & mu_cont.notna().to_numpy()].mean():.3f}",
+      f"| rows {int((sel & S['real']).sum())} {int((sel & S['real'] & S['gen']).sum())} {int((sel & S['real'] & S['gen'] & mu_cont.notna().to_numpy()).sum())}",
+      f"| P(n3) of gen-selected-only rows {N3['real'][sel & S['real'] & ~S['gen']].mean():.3f}")
+
+print("\n7. the link with weaker selections (each sample its own population): is the deficit in the counts or in the nu_score / vertex selection?")
+for name, cut in (("CC + pion, longest track present", lambda d: cc & d.long_trk_len.notna().to_numpy()),
+                  ("+ vertex in FV", lambda d: cc & d.long_trk_len.notna().to_numpy() & fv(d.vtx_x, d.vtx_y, d.vtx_z).to_numpy()),
+                  ("+ nu_score > 0.45", lambda d: cc & d.long_trk_len.notna().to_numpy() & fv(d.vtx_x, d.vtx_y, d.vtx_z).to_numpy() & (d.nu_score > 0.45).to_numpy()),
+                  ("+ nu_score > 0.45, n_pfp <= 4", lambda d: cc & d.long_trk_len.notna().to_numpy() & fv(d.vtx_x, d.vtx_y, d.vtx_z).to_numpy() & (d.nu_score > 0.45).to_numpy() & (d.n_pfp <= 4).to_numpy())):
+    row = []
+    for p, d in (("real", R), ("gen", G)):
+        mm_ = cut(d); l = link(N3[p], EX[p], mm_)
+        row.append(f"{p} n {mm_.sum()} P(n3) {N3[p][mm_].mean():.3f} P(exit) {EX[p][mm_].mean():.3f} link {l[0]:+.3f} [P(n3|exit) {l[1]:.3f} P(n3|cont) {l[2]:.3f}]")
+    print(f"   {name:34s} " + " | ".join(row))
+print("   P(nu_score > 0.45 | n_pfp=3, exit / contained) and P(vertex in FV | n_pfp=3, exit / contained), CC + pion with a longest track   [real | gen]")
+for p, d in (("real", R), ("gen", G)):
+    b = cc & d.long_trk_len.notna().to_numpy() & N3[p]; ns = (d.nu_score > 0.45).to_numpy(); f_ = fv(d.vtx_x, d.vtx_y, d.vtx_z).to_numpy()
+    print(f"   {p:5s} nu_score pass | exit {ns[b & EX[p]].mean():.3f}  cont {ns[b & ~EX[p]].mean():.3f}    FV | exit {f_[b & EX[p]].mean():.3f}  cont {f_[b & ~EX[p]].mean():.3f}    n3 events {b.sum()}")
+
+print("\n8. the reco vertex of n_pfp=3 CC + pion slices whose TRUE vertex is in the FV, by reco exit: pass rates of each FV boundary and the reco-true vertex displacement   [real | gen]")
+tfv = fv(F.vtx_x, F.vtx_y, F.vtx_z).to_numpy()
+for p, d in (("real", R), ("gen", G)):
+    b = cc & d.long_trk_len.notna().to_numpy() & N3[p] & tfv
+    dx, dy, dz = (d[f"vtx_{c}"].to_numpy() - F[f"vtx_{c}"].to_numpy() for c in "xyz"); dr = np.sqrt(dx**2 + dy**2 + dz**2)
+    for lab, e in (("exit", EX[p]), ("cont", ~EX[p])):
+        m_ = b & e
+        print(f"   {p:5s} {lab}  n {m_.sum():5d}  reco FV {fv(d.vtx_x, d.vtx_y, d.vtx_z).to_numpy()[m_].mean():.3f}  |x|<190 {(d.vtx_x.abs() < 190).to_numpy()[m_].mean():.3f}  |y|<190 {(d.vtx_y.abs() < 190).to_numpy()[m_].mean():.3f}  z>10 {(d.vtx_z > 10).to_numpy()[m_].mean():.3f}  z<450 {(d.vtx_z < 450).to_numpy()[m_].mean():.3f}"
+              f"  | displacement median {np.median(dr[m_]):.1f} cm  P(>5 cm) {(dr[m_] > 5).mean():.3f}  P(>20 cm) {(dr[m_] > 20).mean():.3f}  P(>50 cm) {(dr[m_] > 50).mean():.3f}")
+print("   same for ALL CC + pion slices with a longest track and the true vertex in the FV (not only n_pfp=3)")
+for p, d in (("real", R), ("gen", G)):
+    b = cc & d.long_trk_len.notna().to_numpy() & tfv
+    dx, dy, dz = (d[f"vtx_{c}"].to_numpy() - F[f"vtx_{c}"].to_numpy() for c in "xyz"); dr = np.sqrt(dx**2 + dy**2 + dz**2)
+    for lab, e in (("exit", EX[p]), ("cont", ~EX[p])):
+        m_ = b & e
+        print(f"   {p:5s} {lab}  n {m_.sum():5d}  reco FV {fv(d.vtx_x, d.vtx_y, d.vtx_z).to_numpy()[m_].mean():.3f}  | displacement P(>5 cm) {(dr[m_] > 5).mean():.3f}  P(>20 cm) {(dr[m_] > 20).mean():.3f}  P(>50 cm) {(dr[m_] > 50).mean():.3f}   P(n3) {N3[p][m_].mean():.3f}")
+print("   P(n_pfp=3 | displacement > 20 cm / <= 20 cm), CC + pion, true vertex in FV, longest track present   [real | gen]")
+for p, d in (("real", R), ("gen", G)):
+    b = cc & d.long_trk_len.notna().to_numpy() & tfv
+    dr = np.sqrt(sum((d[f"vtx_{c}"].to_numpy() - F[f"vtx_{c}"].to_numpy())**2 for c in "xyz"))
+    print(f"   {p:5s} P(n3 | far) {N3[p][b & (dr > 20)].mean():.3f} (n {(b & (dr > 20)).sum()})  P(n3 | near) {N3[p][b & (dr <= 20)].mean():.3f}   P(exit | far) {EX[p][b & (dr > 20)].mean():.3f}  P(exit | near) {EX[p][b & (dr <= 20)].mean():.3f}")

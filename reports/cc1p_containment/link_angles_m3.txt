@@ -1,0 +1,25 @@
+particle sets (299869, 32, 4)
+held-out half 12254: logloss 80 features 0.2985  + angles 0.2969  marginal 0.3702
+link with the truth-predicted exit: real +0.035  GBDT 80 +0.021  GBDT 80 + angles +0.020
+P(n_pfp=3 | truth-predicted exit bin): real / GBDT 80 / GBDT 80 + angles
+   P(exit) 0.01-0.12  0.104 / 0.106 / 0.107   n 2451
+   P(exit) 0.12-0.34  0.091 / 0.101 / 0.100   n 2451
+   P(exit) 0.34-0.62  0.153 / 0.152 / 0.152   n 2450
+   P(exit) 0.62-0.90  0.164 / 0.145 / 0.144   n 2451
+   P(exit) 0.90-0.99  0.096 / 0.099 / 0.097   n 2451
+P(n_pfp=3 | p_mu, cos theta_mu terciles): real / GBDT 80 / GBDT 80 + angles
+   p_mu 0.08-0.32 | 0.110/0.121/0.119  0.130/0.122/0.124  0.144/0.157/0.162
+   p_mu 0.32-0.63 | 0.096/0.092/0.093  0.104/0.103/0.102  0.172/0.151/0.148
+   p_mu 0.63-5.57 | 0.067/0.094/0.093  0.114/0.106/0.104  0.138/0.137/0.136
+
+real P(n_pfp=3) by cos(mu, pi) in the selection, and by n charged primaries within 15 deg of the muon
+   cos(mu,pi) -2.50..-1.50  P(n3) nan  P(exit) nan  n 0
+   cos(mu,pi) -1.00.. 0.00  P(n3) 0.128  P(exit) 0.436  n 9497
+   cos(mu,pi)  0.00.. 0.70  P(n3) 0.112  P(exit) 0.519  n 9919
+   cos(mu,pi)  0.70.. 0.90  P(n3) 0.111  P(exit) 0.567  n 3467
+   cos(mu,pi)  0.90.. 0.97  P(n3) 0.141  P(exit) 0.588  n 1127
+   cos(mu,pi)  0.97.. 1.00  P(n3) 0.199  P(exit) 0.579  n 497
+   within 15 deg 0  P(n3) 0.120  P(exit) 0.493  n 23181
+   within 15 deg 1  P(n3) 0.144  P(exit) 0.584  n 1287
+   within 15 deg 2  P(n3) 0.189  P(exit) 0.622  n 37
+   within 15 deg >=3  P(n3) 0.000  P(exit) 1.000  n 2

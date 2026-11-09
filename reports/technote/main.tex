@@ -482,6 +482,19 @@ reproduced (0.488). At the M2 level none of the variants reproduces it (longest 
 pion slices with $n_\mathrm{pfp}=3$: 0.480--0.521 against \real{} 0.446); M2s's chain value 0.442 came from its
 distorted $n_\mathrm{pfp}=3$ population, not from the correlation.
 
+\paragraph{Where the link comes from.} On the M2 test slices (\texttt{scripts/diag\_m2\_link.py}) the exit $\leftrightarrow$
+$n_\mathrm{pfp}=3$ link of truth CC + pion events is absent without a vertex cut (\real{} $+0.005$) and appears with
+the cut on the \emph{reconstructed} vertex ($+0.026$; the generated slices give $+0.010$ to $+0.017$ either way).
+Among $n_\mathrm{pfp}=3$ slices whose true vertex is in the FV, the reco vertex passes the FV for 0.975 (exiting
+muon) and 0.958 (contained) of the \real{} slices, 0.932 and 0.968 of the generated ones. The cause is the vertex
+resolution: the reco--true displacement has a median of 0.4--0.6\,cm in \real{} (P($>5$\,cm) 0.08 / 0.13) and
+4--6\,cm in the generated slices (0.30 / 0.36), with matching tails. Exiting-muon events have true vertices nearer
+the downstream and side walls, so the 4\,cm smear pushes them out of the FV. The vertex is generated as an absolute
+position under a robust linear scaling, which hides a 0.5\,cm core next to the 10\,cm-scale misplacements. A bigger
+topology head or muon--hadron angles as extra inputs do not change the link (\texttt{scripts/retrain\_topo\_head.py},
+\texttt{diag\_m2\_link\_angles.py}). Fix to try: generate the vertex as the residual to the true vertex on an asinh
+scale of about 1\,cm.
+
 \begin{figure}[h]\centering\includegraphics[width=\textwidth]{slice_generator_proposal.pdf}
 \caption{The slice generator (M2): shipped scheme and the three two-stage variants tried. Numbers from the
 CC1p0pi acceptance on test jobs 0--199.}\label{fig:slicegen}\end{figure}
@@ -555,7 +568,8 @@ and production-format surrogated datasets for the analysers. Remaining:
       $n_\mathrm{pfp}$--exit link but breaks the joint PFP counts; with the counts as a one-hot topology class in
       stage 1 (M2o) the counts are right but the link is lost; with the class from a classifier on the generated
       stage 1 (M2c) the counts are right and the acceptance equals the shipped chain, the link still missing.
-      Open: where the exit $\leftrightarrow$ $n_\mathrm{pfp}$ correlation enters the \real{} reconstruction.
+      The link is the reco-vertex resolution (core 4--6\,cm generated against 0.5\,cm \real{}): generate the vertex
+      as the residual to the true vertex on an asinh scale.
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and

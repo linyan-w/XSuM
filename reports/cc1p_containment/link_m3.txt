@@ -42,3 +42,34 @@
    AUC of the truth-predicted exit vs real exit 0.879, vs gen exit 0.870; accuracy at 0.5: real 0.792 gen 0.775
    real  link with the truth-predicted exit +0.040   with its own reco exit +0.035
    gen   link with the truth-predicted exit +0.009   with its own reco exit +0.002
+
+6. inside the bins of the truth-predicted exit probability: P(n_pfp=3 | bin, reco exit / contained) and by the Geant4 muon   [real | gen]
+   P(exit) 0.01-0.12  real 0.102/0.098 (link +0.004) | gen 0.109/0.104 (link +0.005) | Geant4 exit/cont real 0.051/0.094 gen 0.077/0.105
+   P(exit) 0.12-0.35  real 0.134/0.079 (link +0.055) | gen 0.087/0.082 (link +0.004) | Geant4 exit/cont real 0.109/0.080 gen 0.096/0.081
+   P(exit) 0.35-0.61  real 0.182/0.114 (link +0.068) | gen 0.114/0.101 (link +0.013) | Geant4 exit/cont real 0.122/0.084 gen 0.128/0.094
+   P(exit) 0.61-0.90  real 0.168/0.180 (link -0.012) | gen 0.085/0.101 (link -0.016) | Geant4 exit/cont real 0.112/0.074 gen 0.098/0.077
+   P(exit) 0.90-0.99  real 0.097/0.115 (link -0.018) | gen 0.105/0.148 (link -0.043) | Geant4 exit/cont real 0.088/0.062 gen 0.109/0.062
+   check: P(n_pfp=3) real over the half-sample selection, with the gen selection too, with the Geant4 muon known: 0.121  0.092  0.092 | rows 12254 10841 10841 | P(n3) of gen-selected-only rows 0.347
+
+7. the link with weaker selections (each sample its own population): is the deficit in the counts or in the nu_score / vertex selection?
+   CC + pion, longest track present   real n 46435 P(n3) 0.178 P(exit) 0.524 link +0.005 [P(n3|exit) 0.180 P(n3|cont) 0.175] | gen n 46497 P(n3) 0.178 P(exit) 0.496 link +0.014 [P(n3|exit) 0.185 P(n3|cont) 0.171]
+   + vertex in FV                     real n 25892 P(n3) 0.132 P(exit) 0.494 link +0.026 [P(n3|exit) 0.146 P(n3|cont) 0.119] | gen n 26217 P(n3) 0.134 P(exit) 0.460 link +0.010 [P(n3|exit) 0.139 P(n3|cont) 0.130]
+   + nu_score > 0.45                  real n 24507 P(n3) 0.121 P(exit) 0.498 link +0.026 [P(n3|exit) 0.134 P(n3|cont) 0.108] | gen n 24889 P(n3) 0.123 P(exit) 0.468 link +0.014 [P(n3|exit) 0.130 P(n3|cont) 0.116]
+   + nu_score > 0.45, n_pfp <= 4      real n 9733 P(n3) 0.305 P(exit) 0.512 link +0.049 [P(n3|exit) 0.329 P(n3|cont) 0.280] | gen n 10056 P(n3) 0.304 P(exit) 0.468 link +0.035 [P(n3|exit) 0.322 P(n3|cont) 0.287]
+   P(nu_score > 0.45 | n_pfp=3, exit / contained) and P(vertex in FV | n_pfp=3, exit / contained), CC + pion with a longest track   [real | gen]
+   real  nu_score pass | exit 0.805  cont 0.859    FV | exit 0.426  cont 0.404    n3 events 8243
+   gen   nu_score pass | exit 0.817  cont 0.860    FV | exit 0.393  cont 0.458    n3 events 8276
+
+8. the reco vertex of n_pfp=3 CC + pion slices whose TRUE vertex is in the FV, by reco exit: pass rates of each FV boundary and the reco-true vertex displacement   [real | gen]
+   real  exit  n  1009  reco FV 0.975  |x|<190 0.997  |y|<190 0.988  z>10 0.994  z<450 0.993  | displacement median 0.4 cm  P(>5 cm) 0.157  P(>20 cm) 0.076  P(>50 cm) 0.034
+   real  cont  n  1190  reco FV 0.958  |x|<190 0.994  |y|<190 0.982  z>10 0.988  z<450 0.993  | displacement median 0.6 cm  P(>5 cm) 0.339  P(>20 cm) 0.205  P(>50 cm) 0.109
+   gen   exit  n  1009  reco FV 0.932  |x|<190 0.980  |y|<190 0.974  z>10 0.994  z<450 0.978  | displacement median 4.3 cm  P(>5 cm) 0.429  P(>20 cm) 0.089  P(>50 cm) 0.042
+   gen   cont  n  1212  reco FV 0.968  |x|<190 0.995  |y|<190 0.992  z>10 0.982  z<450 0.999  | displacement median 5.6 cm  P(>5 cm) 0.561  P(>20 cm) 0.193  P(>50 cm) 0.096
+   same for ALL CC + pion slices with a longest track and the true vertex in the FV (not only n_pfp=3)
+   real  exit  n 10955  reco FV 0.989  | displacement P(>5 cm) 0.078  P(>20 cm) 0.035  P(>50 cm) 0.016   P(n3) 0.092
+   real  cont  n 12018  reco FV 0.985  | displacement P(>5 cm) 0.131  P(>20 cm) 0.075  P(>50 cm) 0.039   P(n3) 0.099
+   gen   exit  n 10595  reco FV 0.975  | displacement P(>5 cm) 0.300  P(>20 cm) 0.039  P(>50 cm) 0.015   P(n3) 0.095
+   gen   cont  n 12394  reco FV 0.982  | displacement P(>5 cm) 0.357  P(>20 cm) 0.070  P(>50 cm) 0.030   P(n3) 0.098
+   P(n_pfp=3 | displacement > 20 cm / <= 20 cm), CC + pion, true vertex in FV, longest track present   [real | gen]
+   real  P(n3 | far) 0.248 (n 1293)  P(n3 | near) 0.087   P(exit | far) 0.299  P(exit | near) 0.487
+   gen   P(n3 | far) 0.252 (n 1284)  P(n3 | near) 0.087   P(exit | far) 0.320  P(exit | near) 0.469
