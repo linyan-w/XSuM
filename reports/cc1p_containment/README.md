@@ -189,3 +189,5 @@ tuple distribution 0.092 (M2s 0.170). But the argmax over 121 classes overweight
 (n_pfp >= 6 0.115 vs 0.084, n_shower >= 1 0.303 vs 0.257), the slice block is worse (long_trk_len W1 0.023 vs 0.005),
 and the targeted link is lost again: CC Npi at n_pfp=3 longest end in FV 0.515 (real 0.439, M2s 0.442). Rule fixes:
 short-for-n_trk=2 3.3%, two-outside-2trk 1.1%; cohpi SR 89 vs real 156 (M2s 104).
+
+Schematic of the shipped slice generator, the two variants and the proposal: `docs/figures/slice_generator_proposal.svg`.

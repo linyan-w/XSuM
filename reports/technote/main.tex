@@ -473,7 +473,14 @@ over the 121 classes, decoded by argmax; \texttt{--topo-onehot}). Every generate
 (3, 2, 2, $\cdot$, 0) is 0.435 of $n_\mathrm{pfp}=3$ and P(PFP 2prong | $n_\mathrm{pfp}=3$) 0.966 for signal, but
 the argmax overweights the high-multiplicity classes ($n_\mathrm{pfp}\ge6$ 0.115 against 0.084), the longest-track
 length is generated less well, and the link is lost again (0.515); purity 0.371, efficiency 0.170. None of these
-studies is shipped; the shipped M2 is unchanged.
+studies is shipped; the shipped M2 is unchanged. Figure~\ref{fig:slicegen} puts the shipped slice generator, the
+two variants and the next candidate side by side: stage 1 without the counts, the topology class from a classifier
+on the truth and the generated stage-1 values including the presence flags, restricted to the classes compatible
+with the sampled presence.
+
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{slice_generator_proposal.pdf}
+\caption{The slice generator (M2): shipped scheme, the two two-stage variants tried, and the proposed one (row 4,
+not yet trained). Numbers from the CC1p0pi acceptance on test jobs 0--199.}\label{fig:slicegen}\end{figure}
 
 \begin{table}[h]\centering\small
 \begin{tabular}{lccc}\toprule

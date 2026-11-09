@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1010" viewBox="0 0 1180 1010" font-family="Helvetica, Arial, sans-serif" font-size="13">
+<rect width="1180" height="1010" fill="#fff"/>
+<defs><marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker></defs>
+<style>.box{stroke:#444;stroke-width:1.2;rx:6}.in{fill:#e3f0fb}.model{fill:#fdf1dc}.rule{fill:#ececec}.res{fill:#fff}.prop{fill:#fffbe6}
+.h{font-weight:bold;font-size:14px}.b{font-weight:bold;font-size:12px}.s{font-size:11px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}</style>
+<text x="20" y="28" class="h" font-size="17">Slice generator: the shipped scheme, the two variants tried, and the proposal   (2026-11-09)</text>
+<text x="20" y="48" class="cap">Each row generates one slice record from the truth; the PFP generator (unchanged, run m4_official_m3w0) then builds the PFP set from it. Numbers: CC1p0pi acceptance on test jobs 0-199.</text>
+<text x="20" y="78" class="h">1. Shipped slice generator  (run m2_official_m3)</text>
+<rect x="20" y="88" width="140" height="158" class="box in"/>
+<text x="30" y="106" class="b">Truth input</text>
+<text x="30" y="124" class="s">80 summary features</text>
+<text x="30" y="139" class="s">+ 64-d particle-encoder z</text>
+<text x="30" y="154" class="s"></text>
+<text x="30" y="169" class="s">(no Geant4 quantities)</text>
+<line x1="160" y1="166" x2="175" y2="166" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="175" y="88" width="200" height="158" class="box model"/>
+<text x="185" y="106" class="b">Topology classifier</text>
+<text x="185" y="124" class="s">softmax MLP, 121 classes of</text>
+<text x="185" y="139" class="s">(n_pfp, n_prong, n_trk,</text>
+<text x="185" y="154" class="s">  n_proton, n_shower)</text>
+<text x="185" y="169" class="s">sampled first, from truth</text>
+<text x="185" y="184" class="s">-&gt; the PFP counts</text>
+<line x1="375" y1="166" x2="390" y2="166" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="390" y="88" width="200" height="158" class="box model"/>
+<text x="400" y="106" class="b">Presence classifiers</text>
+<text x="400" y="124" class="s">GBDT on truth + class:</text>
+<text x="400" y="139" class="s">has 2nd track</text>
+<text x="400" y="154" class="s">has two-track block</text>
+<text x="400" y="169" class="s">has charge spheres 1-4 cm</text>
+<text x="400" y="184" class="s">+ point masses</text>
+<line x1="590" y1="166" x2="605" y2="166" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="605" y="88" width="230" height="158" class="box model"/>
+<text x="615" y="106" class="b">One flow: all slice values</text>
+<text x="615" y="124" class="s">~50 numbers: vertex, scores,</text>
+<text x="615" y="139" class="s">longest track, 2nd track,</text>
+<text x="615" y="154" class="s">two-track block, spheres</text>
+<text x="615" y="169" class="s">masked to the groups present</text>
+<text x="615" y="184" class="s">conditioned on truth + class</text>
+<line x1="835" y1="166" x2="860" y2="166" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="860" y="88" width="300" height="158" class="box res"/>
+<text x="870" y="106" class="b">Result (jobs 0-199): purity 0.394, eff 0.191</text>
+<text x="870" y="124" class="s">(real 0.435 / 0.198).</text>
+<text x="870" y="139" class="s">Counts, presence and the longest track are drawn</text>
+<text x="870" y="154" class="s">in separate pieces, each from the truth alone.</text>
+<text x="870" y="169" class="s">Lost: exiting longest track &lt;-&gt; fewer PFPs.</text>
+<text x="870" y="184" class="s">CC Npi at n_pfp = 3, longest end in FV: 0.49</text>
+<text x="870" y="199" class="s">(real 0.44) -&gt; too many CC Npi pass 2prong-contained.</text>
+<text x="20" y="283" class="h">2. Variant A tried  (run m2s): two stages, counts as continuous numbers in stage 1</text>
+<rect x="20" y="293" width="140" height="158" class="box in"/>
+<text x="30" y="311" class="b">Truth input</text>
+<text x="30" y="329" class="s">80 summary features</text>
+<text x="30" y="344" class="s">+ 64-d particle-encoder z</text>
+<text x="30" y="359" class="s"></text>
+<text x="30" y="374" class="s">(no Geant4 quantities)</text>
+<line x1="160" y1="371" x2="175" y2="371" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="175" y="293" width="250" height="158" class="box model"/>
+<text x="185" y="311" class="b">Stage-1 flow  (one joint sample)</text>
+<text x="185" y="329" class="s">always-present values: vertex,</text>
+<text x="185" y="344" class="s">scores, longest track (+ wall flag)</text>
+<text x="185" y="359" class="s">+ the 5 counts as continuous</text>
+<text x="185" y="374" class="s">   numbers, rounded afterwards</text>
+<text x="185" y="389" class="s">+ 6 presence flags</text>
+<line x1="425" y1="371" x2="440" y2="371" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="440" y="293" width="150" height="158" class="box rule"/>
+<text x="450" y="311" class="b">Hard rules</text>
+<text x="450" y="329" class="s">counts nested</text>
+<text x="450" y="344" class="s">n_trk &gt;= 2 -&gt; 2nd track</text>
+<text x="450" y="359" class="s">two-track block only</text>
+<text x="450" y="374" class="s">  for n_prong = n_trk = 2</text>
+<text x="450" y="389" class="s">fixes: &lt; 1% of slices</text>
+<line x1="590" y1="371" x2="605" y2="371" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="605" y="293" width="230" height="158" class="box model"/>
+<text x="615" y="311" class="b">Stage-2 flow: optional groups</text>
+<text x="615" y="329" class="s">2nd track, two-track block,</text>
+<text x="615" y="344" class="s">charge spheres</text>
+<text x="615" y="359" class="s">conditioned on truth + stage-1</text>
+<text x="615" y="374" class="s">output; masked by the</text>
+<text x="615" y="389" class="s">sampled presence</text>
+<line x1="835" y1="371" x2="860" y2="371" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="860" y="293" width="300" height="158" class="box res"/>
+<text x="870" y="311" class="b">Result: the link closes (0.442 vs 0.439),</text>
+<text x="870" y="329" class="s">pion range momentum on the curve 93% (real 93%).</text>
+<text x="870" y="344" class="s">But rounding 5 continuous numbers does not keep</text>
+<text x="870" y="359" class="s">the real count combinations: 17% of slices get a</text>
+<text x="870" y="374" class="s">tuple real slices never have; (3,2,2,*,0) is 0.34</text>
+<text x="870" y="389" class="s">of n_pfp = 3 (real 0.44). The PFP generator then</text>
+<text x="870" y="404" class="s">builds fewer 2-track sets.  Purity 0.396, eff 0.165.</text>
+<text x="20" y="488" class="h">3. Variant B tried  (run m2o): two stages, counts as a one-hot class in stage 1</text>
+<rect x="20" y="498" width="140" height="158" class="box in"/>
+<text x="30" y="516" class="b">Truth input</text>
+<text x="30" y="534" class="s">80 summary features</text>
+<text x="30" y="549" class="s">+ 64-d particle-encoder z</text>
+<text x="30" y="564" class="s"></text>
+<text x="30" y="579" class="s">(no Geant4 quantities)</text>
+<line x1="160" y1="576" x2="175" y2="576" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="175" y="498" width="250" height="158" class="box model"/>
+<text x="185" y="516" class="b">Stage-1 flow  (one joint sample)</text>
+<text x="185" y="534" class="s">always-present values: vertex,</text>
+<text x="185" y="549" class="s">scores, longest track (+ wall flag)</text>
+<text x="185" y="564" class="s">+ the counts as a one-hot over the</text>
+<text x="185" y="579" class="s">   121 classes: noisy in training,</text>
+<text x="185" y="594" class="s">   argmax at sampling</text>
+<text x="185" y="609" class="s">+ 6 presence flags</text>
+<line x1="425" y1="576" x2="440" y2="576" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="440" y="498" width="150" height="158" class="box rule"/>
+<text x="450" y="516" class="b">Hard rules</text>
+<text x="450" y="534" class="s">counts always a real tuple</text>
+<text x="450" y="549" class="s">n_trk &gt;= 2 -&gt; 2nd track</text>
+<text x="450" y="564" class="s">two-track block only</text>
+<text x="450" y="579" class="s">  for n_prong = n_trk = 2</text>
+<text x="450" y="594" class="s">fixes: 3.3% / 1.1%</text>
+<line x1="590" y1="576" x2="605" y2="576" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="605" y="498" width="230" height="158" class="box model"/>
+<text x="615" y="516" class="b">Stage-2 flow: optional groups</text>
+<text x="615" y="534" class="s">as in row 2</text>
+<line x1="835" y1="576" x2="860" y2="576" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="860" y="498" width="300" height="158" class="box res"/>
+<text x="870" y="516" class="b">Result: every tuple real; (3,2,2,*,0) 0.435</text>
+<text x="870" y="534" class="s">(real 0.439); P(PFP 2prong | n_pfp = 3) 0.966 (0.971).</text>
+<text x="870" y="549" class="s">But the argmax over 121 entries overweights high</text>
+<text x="870" y="564" class="s">multiplicity (n_pfp &gt;= 6: 0.115 vs 0.084), the</text>
+<text x="870" y="579" class="s">longest-track length is generated less well, and</text>
+<text x="870" y="594" class="s">the link is lost again (0.515).</text>
+<text x="870" y="609" class="s">Purity 0.371, eff 0.170.</text>
+<text x="20" y="693" class="h" fill="#8a6d00">4. Proposal: two stages, counts from a classifier that reads the generated stage 1</text>
+<rect x="20" y="703" width="140" height="158" class="box in"/>
+<text x="30" y="721" class="b">Truth input</text>
+<text x="30" y="739" class="s">80 summary features</text>
+<text x="30" y="754" class="s">+ 64-d particle-encoder z</text>
+<text x="30" y="769" class="s"></text>
+<text x="30" y="784" class="s">(no Geant4 quantities)</text>
+<line x1="160" y1="781" x2="175" y2="781" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="175" y="703" width="190" height="158" class="box model"/>
+<text x="185" y="721" class="b">Stage-1 flow  (one joint sample)</text>
+<text x="185" y="739" class="s">always-present values: vertex,</text>
+<text x="185" y="754" class="s">scores, longest track (+ wall)</text>
+<text x="185" y="769" class="s">+ 6 presence flags</text>
+<text x="185" y="784" class="s">no counts</text>
+<line x1="365" y1="781" x2="380" y2="781" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="380" y="703" width="210" height="158" class="box model"/>
+<text x="390" y="721" class="b">Topology classifier</text>
+<text x="390" y="739" class="s">softmax over the 121 classes</text>
+<text x="390" y="754" class="s">input: truth + generated stage-1</text>
+<text x="390" y="769" class="s">   values and presence flags</text>
+<text x="390" y="784" class="s">classes incompatible with the</text>
+<text x="390" y="799" class="s">   sampled presence set to 0</text>
+<text x="390" y="814" class="s">sampled -&gt; the PFP counts</text>
+<line x1="590" y1="781" x2="605" y2="781" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="605" y="703" width="230" height="158" class="box model"/>
+<text x="615" y="721" class="b">Stage-2 flow: optional groups</text>
+<text x="615" y="739" class="s">as in row 2; conditioned on</text>
+<text x="615" y="754" class="s">truth + stage-1 output + class</text>
+<line x1="835" y1="781" x2="860" y2="781" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="860" y="703" width="300" height="158" class="box prop"/>
+<text x="870" y="721" class="b">Expected  (not yet trained)</text>
+<text x="870" y="739" class="s">Counts: calibrated class probabilities over real tuples</text>
+<text x="870" y="754" class="s">only, compatible with the sampled presence -&gt; no</text>
+<text x="870" y="769" class="s">invalid tuples, right proportions (cures rows 2 and 3).</text>
+<text x="870" y="784" class="s">The link: longest track and presence are one joint</text>
+<text x="870" y="799" class="s">sample and the class reads both (swap test: 2nd-track</text>
+<text x="870" y="814" class="s">presence is the largest single carrier).</text>
+<text x="870" y="829" class="s">Risk: the topology-last variant (run m2t) lost the link on</text>
+<text x="870" y="844" class="s">a generated block; there presence came from truth alone.</text>
+<rect x="20" y="900" width="1140" height="98" class="box res"/>
+<text x="32" y="920" class="h">Terms</text>
+<text x="32" y="938" class="s">always-present values: vertex, nu_score, bcfm_score, total_pe, longest-track direction / length / PID / chi2 (every slice has them).  optional groups: 2nd track (9 values),</text>
+<text x="32" y="952" class="s">two-track block (reco_t, opening angle, range momenta, 12 end points), charge in 1-4 cm spheres.  presence flags: has 2nd track, has two-track block, has sphere 1 / 2 / 3 / 4.</text>
+<text x="32" y="966" class="s">counts: n_pfp, n_prong, n_trk, n_proton, n_shower; 121 real combinations + other.  the link: in real data a slice whose longest track leaves the TPC tends to have fewer PFPs,</text>
+<text x="32" y="980" class="s">so CC Npi events with an exiting muon fall into n_pfp = 3 (the 2prong bin) more often.  Colours: blue truth input, orange learned model, grey deterministic rule, white result, yellow expected.</text>
+<text x="32" y="994" class="s">Models: particle encoder (code m3), slice generator (code m2), PFP generator (code m4).</text>
+</svg>
