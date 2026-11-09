@@ -47,7 +47,7 @@ class Surrogate:
         self.flow.load_state_dict(ck["state"]); self.flow.eval()
         th = torch.load(f"{d}/topology_head.pt", map_location=device, weights_only=False)
         self.topo_head = MLPClassifier(th["n_in"], th["n_classes"], device=device); self.topo_head.net.load_state_dict(th["state"])
-        self.topo_last = bool(ck.get("topo_last", False))
+        self.topo_last = bool(ck.get("topo_last", False)); self.vtx_resid = bool(ck.get("vtx_resid", False)); self.vtx_range = ck.get("vtx_range")
 
     def standardise(self, X):
         return ((np.arcsinh(X) - self.std_m) / self.std_s).astype(np.float32)
@@ -87,6 +87,10 @@ def generate(sur: Surrogate, F: pd.DataFrame, seed: int = 0, cardinality: bool =
     XH = np.concatenate([Xr, sur.topo.onehot(k)], 1)
     idx = pd.MultiIndex.from_arrays([F.index.get_level_values(i)[rows] for i in range(F.index.nlevels)] + [draw], names=list(F.index.names) + ["draw"])
     out = sur.bt.frame(Z, M, idx)
+    if sur.vtx_resid:                 # vertex generated as the residual to the true vertex
+        for c in ("vtx_x", "vtx_y", "vtx_z"):
+            out[c] = out[c] + Fr[c].to_numpy()
+            if sur.vtx_range: out[c] = out[c].clip(*sur.vtx_range[c])
     cnt = sur.topo.decode(k, rng); cnt.index = idx
     for c in TOPO_COLS:
         out[c] = cnt[c]

@@ -157,6 +157,8 @@ N_TOPO = 120
 
 
 EDGE = 1 - 1e-5
+VTX_COLS = ["vtx_x", "vtx_y", "vtx_z"]
+VTX_SCALE = 1.0   # cm: the reco vertex as the residual to the true vertex on an asinh scale (vtx_resid models)
 
 
 def fwd(x, tf):
@@ -164,6 +166,7 @@ def fwd(x, tf):
     if tf == "log": return np.log(np.where(x > 0, x, np.nan))
     if tf == "log1p": return np.log1p(np.where(x >= 0, x, np.nan))
     if tf == "atanh": return np.arctanh(np.clip(x, -EDGE, EDGE))
+    if tf == "asinh1": return np.arcsinh(x / VTX_SCALE)
     return x   # lin, flag, count
 
 
@@ -173,6 +176,7 @@ def inv(y, tf):
     if tf == "atanh": return np.tanh(y)
     if tf == "flag": return (y > 0.5).astype(np.float64)
     if tf == "count": return np.maximum(np.round(y), 0.0)
+    if tf == "asinh1": return np.sinh(np.clip(y, -7.6, 7.6)) * VTX_SCALE   # residual within 1000 cm
     return y
 
 
@@ -398,7 +402,7 @@ def report(real, gen, T, tm, L, kgen, ktrue, metrics, out):
 
 
 def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=False,
-        topo_last=False, range_curve=False, two_stage=False, topo_onehot=False, topo_cls=False):
+        topo_last=False, range_curve=False, two_stage=False, topo_onehot=False, topo_cls=False, vtx_resid=False):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
     then table_dir is expected to hold matched slices only (see scripts/split_official_table.py).
     Defaults = the shipped M2 (m2_official_m3). Studies (technote Sec. 8): walls (M2w), topo_last + range_curve (M2t).
@@ -415,7 +419,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     slices then carry only count tuples of the real table.
     topo_cls (with two_stage): stage 1 carries no counts; the topology class is sampled from a classifier on the truth
     and the generated stage-1 block (values + presence flags), restricted to the classes compatible with the sampled
-    presence; stage 2 is also conditioned on the class."""
+    presence; stage 2 is also conditioned on the class.
+    vtx_resid: the reco vertex is generated as the residual to the true vertex, asinh(d / 1 cm), instead of the absolute
+    position under a robust linear scaling (which hides the 0.5 cm resolution core next to the 10 cm-scale
+    misplacements); the wall point masses stay absolute. Added back at generation."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
@@ -439,7 +446,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     if max_rows and len(F) > max_rows:
         sub_rows = np.sort(np.random.default_rng(seed).choice(len(F), max_rows, replace=False)); F, card = F.iloc[sub_rows], card.iloc[sub_rows]
     names = list(F.columns); X = np.ascontiguousarray(F.to_numpy(np.float32))
-    F = F[["vtx_x", "vtx_y"]]          # only the vertex signs are needed later (point-mass values)
+    F = F[VTX_COLS]                    # the true vertex: point-mass signs, and the reference of the vertex residual
     file_id = F.index.get_level_values("chunk").to_numpy() * 100000 + F.index.get_level_values("__ntuple").to_numpy()
     split = split_by_level(pd.MultiIndex.from_arrays([file_id], names=["file"]), level="file", seed=seed)
     tr, va, te = split["train"], split["val"], split["test"]
@@ -486,14 +493,20 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     if range_curve:
         curves = fit_range_curves(T[tr]); T = add_range_targets(T, curves)
         metrics["range_on_curve_train"] = {k: float(np.nanmean(T.loc[tr, f"range_{k}_on"])) for k in RANGE_PAIRS}
-    bt = BlockTransform(SPEC + (WALL_SPEC if walls else []) + (RANGE_SPEC if range_curve else [])); P = presence(T, bt)
+    Tabs = T[VTX_COLS].copy()                     # absolute reco vertex (point-mass tests, real frame of the closure)
+    spec = SPEC + (WALL_SPEC if walls else []) + (RANGE_SPEC if range_curve else [])
+    if vtx_resid:
+        for c in VTX_COLS: T[c] = T[c] - F[c].to_numpy(np.float32)
+        spec = [(c, "asinh1", g) if c in VTX_COLS else (c, tf, g) for c, tf, g in spec]
+    bt = BlockTransform(spec); P = presence(T, bt)
+    metrics["vtx_resid"] = bool(vtx_resid)
     # ---- standardised block (needed by the topology head of topo_last models) ----------------------------------
     Y = bt.matrix(T).astype(np.float32); bt.fit(Y[tr & matched])
     Z, Mfin = bt.standardise(Y); del Y
     Mg = mask_from_presence(P, bt) * Mfin          # groups absent or values non-finite are masked
     Sreal = {}
     for c, (test, _) in SPIKES.items():
-        j = bt.cols.index(c); v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v)
+        j = bt.cols.index(c); v = (Tabs[c] if c in VTX_COLS else T[c]).to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v)
         Mg[Sreal[c], j] = 0.0                      # point masses are not modelled by the flow
 
     # topology: joint categorical over the PFP counts; sampled first (fed to every other component) or, topo_last,
@@ -530,7 +543,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     for fl in FLAGS:
         fit_head(fl, np.nan_to_num(T[fl].to_numpy(), nan=0).astype(int), matched & P["two"])
     for c, (test, _) in SPIKES.items():
-        v = T[c].to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
+        v = (Tabs[c] if c in VTX_COLS else T[c]).to_numpy(); ok = np.isfinite(v); y = (test(np.nan_to_num(v, nan=1e9)) & ok).astype(int)
         fit_head("spike_" + c, y, matched & ok & (P["two"] if c == "opening_angle" else True), with_topo=not topo_last)
     metrics["presence"] = pres_metrics; mem("after heads")
     print("presence:", {k: round(v["auc"], 3) for k, v in pres_metrics.items()}, flush=True)
@@ -560,6 +573,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     XHg = np.concatenate([X[tm], topo.onehot(kgen)], 1)
     gen = bt.frame(Zgen, Mgen, idx)
     real = bt.frame(Z[tm], Mg[tm], idx)           # same transform round trip for a fair comparison
+    vtx_range = {c: (float(Tabs[c][tr].min()), float(Tabs[c][tr].max())) for c in VTX_COLS} if vtx_resid else None
+    if vtx_resid:                                 # back to absolute positions, within the real range (residual tails of outside-AV neutrinos)
+        for c in VTX_COLS:
+            gen[c] = (gen[c] + F[c].to_numpy()[tm]).clip(*vtx_range[c]); real[c] = real[c] + F[c].to_numpy()[tm]; T[c] = Tabs[c]
     cnt_gen = topo.decode(kgen, rng); cnt_gen.index = idx
     for c in TOPO_COLS:
         gen[c] = cnt_gen[c]; real[c] = T[c].to_numpy()[tm]
@@ -572,7 +589,7 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         real[fl] = T[fl].to_numpy()[tm]
     apply_walls(gen); apply_range(gen, curves)
     report(real, gen, T, tm, L, kgen, ktrue, metrics, out)
-    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + (0 if topo_last else topo.other + 1), "topo_last": bool(topo_last), "range_curves": curves, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
+    torch.save({"state": model.state_dict(), "dim": Z.shape[1], "cond_dim": C.shape[1] + (0 if topo_last else topo.other + 1), "topo_last": bool(topo_last), "range_curves": curves, "vtx_resid": bool(vtx_resid), "vtx_range": vtx_range, "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
                 "std_m": std.m, "std_s": std.s, "bt_med": bt.med, "bt_mad": bt.mad, "features": names, "spec": bt.spec}, out / "model.pt")
     import pickle
     topo_head = heads.pop("topology"); torch.save({"state": topo_head.net.state_dict(), "n_in": C.shape[1] + (2 * Z.shape[1] if topo_last else 0), "n_classes": topo.other + 1}, out / "topology_head.pt")
