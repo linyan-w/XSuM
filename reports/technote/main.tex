@@ -468,9 +468,12 @@ purity 0.396 at 2prong-contained (\real{} 0.198 / 0.435), P(PFP 2prong | slice $
 0.97 for signal. The dequantised counts do not keep the joint count lattice: 17\% of the generated slices carry a
 ($n_\mathrm{pfp}, n_\mathrm{prong}, n_\mathrm{trk}, n_\mathrm{proton}, n_\mathrm{shower}$) tuple that \real{} slices
 do not populate, and the (3, 2, 2, $\cdot$, 0) tuples are 0.341 of $n_\mathrm{pfp}=3$ against 0.439, so M4 builds
-fewer two-track sets. A variant with the counts entering stage 1 as the topology class (a dequantised one-hot,
-decoded by argmax; \texttt{--topo-onehot}, pipeline M2o) is being trained. None of these studies is shipped; the
-shipped M2 is unchanged.
+fewer two-track sets. In the variant M2o the counts enter stage 1 as the topology class (a dequantised one-hot
+over the 121 classes, decoded by argmax; \texttt{--topo-onehot}). Every generated tuple is then a \real{} one,
+(3, 2, 2, $\cdot$, 0) is 0.435 of $n_\mathrm{pfp}=3$ and P(PFP 2prong | $n_\mathrm{pfp}=3$) 0.966 for signal, but
+the argmax overweights the high-multiplicity classes ($n_\mathrm{pfp}\ge6$ 0.115 against 0.084), the longest-track
+length is generated less well, and the link is lost again (0.515); purity 0.371, efficiency 0.170. None of these
+studies is shipped; the shipped M2 is unchanged.
 
 \begin{table}[h]\centering\small
 \begin{tabular}{lccc}\toprule
@@ -538,8 +541,9 @@ Done so far: the official sample, M1 baselines, M2 (slice block), M3 (particle-s
 and production-format surrogated datasets for the analysers. Remaining:
 \begin{enumerate}
 \item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): the two-stage M2 (M2s) closes the CC N$\pi$
-      $n_\mathrm{pfp}$--exit link but breaks the joint PFP counts; the version with the counts as a one-hot
-      topology class in stage 1 (M2o) is in training.
+      $n_\mathrm{pfp}$--exit link but breaks the joint PFP counts; with the counts as a one-hot topology class in
+      stage 1 (M2o) the counts are right but the link is lost. Next candidate: stage 1 without the counts, the
+      topology class from a classifier on the truth and the generated stage-1 block including the presence flags.
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and

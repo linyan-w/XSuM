@@ -170,3 +170,22 @@ count lattice. 17% of generated slices carry a (n_pfp, n_prong, n_trk, n_proton,
 not populate (P < 1e-4), n_pfp = n_trk + n_shower + 1 holds for 0.504 (real 0.590), and (3,2,2,*,0) is 0.341 of
 n_pfp=3 (real 0.439). M4 then builds fewer 2-track sets. The muon end beyond the wall is 4.3% (real 0.06%); M2w had
 the same. Fix to try: keep the counts categorical (topology class) inside stage 1.
+
+## M2o: two-stage M2 with the counts as a one-hot topology class (`--two-stage --topo-onehot --walls --range-curve`), 2026-11-08
+
+`accept_m2o.txt`, `diag_m2o_summary.txt`, `m2_purity_m2o.txt`, `topo_m2o.txt` (dataset `surrogate_official_m2o_pfp`, jobs 0-199).
+First run killed by the 24 GB limit at stage 2 (`reports/pipeline_m2o_oom.log`); rerun after 78a8c43.
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| M2s | 3,198 | 0.165 / 0.396 | 0.454 / 0.342 | 0.090 / 0.876 |
+| M2o | 3,511 | 0.170 / 0.371 | 0.462 / 0.317 | 0.090 / 0.847 |
+
+The lattice is fixed: every generated count tuple is a real one, (3,2,2,*,0) is 0.435 of n_pfp=3 (real 0.439, M2s
+0.341), P(PFP 2prong | slice n_pfp=3) 0.966 for signal (real 0.971, M2s 0.85), total-variation distance of the
+tuple distribution 0.092 (M2s 0.170). But the argmax over 121 classes overweights the high-multiplicity tuples
+(n_pfp >= 6 0.115 vs 0.084, n_shower >= 1 0.303 vs 0.257), the slice block is worse (long_trk_len W1 0.023 vs 0.005),
+and the targeted link is lost again: CC Npi at n_pfp=3 longest end in FV 0.515 (real 0.439, M2s 0.442). Rule fixes:
+short-for-n_trk=2 3.3%, two-outside-2trk 1.1%; cohpi SR 89 vs real 156 (M2s 104).
