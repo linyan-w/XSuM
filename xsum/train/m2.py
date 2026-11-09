@@ -592,7 +592,9 @@ ONEHOT_NOISE = 0.8   # one-hot block: 2 H - 1 + U(-0.8, 0.8); the true class sta
 
 
 def onehot_block(k, n, rng):
-    return (2.0 * np.eye(n, dtype=np.float32)[k] - 1.0 + rng.uniform(-ONEHOT_NOISE, ONEHOT_NOISE, (len(k), n))).astype(np.float32)
+    H = (rng.random((len(k), n), dtype=np.float32) - 0.5) * np.float32(2 * ONEHOT_NOISE) - 1.0   # float32 throughout (memory)
+    H[np.arange(len(k)), k] += 2.0
+    return H
 
 
 def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0,
@@ -633,10 +635,10 @@ def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs
 
     print("stage 1 flow", flush=True)
     f1, h1 = train_flow(Z1[trm], M1[trm], C[trm], ktrue[trm], Z1[vam], M1[vam], C[vam], ktrue[vam], 0, epochs, device, hidden, n_layers, seed=seed)
-    C2 = np.concatenate([C, Z1 * M1], 1).astype(np.float32)
+    c2 = lambda m: np.concatenate([C[m], Z1[m] * M1[m]], 1).astype(np.float32)   # train / val rows only (memory)
     print("stage 2 flow", flush=True)
-    f2, h2 = train_flow(Z2[trm], M2[trm], C2[trm], ktrue[trm], Z2[vam], M2[vam], C2[vam], ktrue[vam], 0, epochs, device, hidden, n_layers, seed=seed + 1)
-    metrics["flow_val_curve"] = h1; metrics["flow2_val_curve"] = h2; del C2
+    f2, h2 = train_flow(Z2[trm], M2[trm], c2(trm), ktrue[trm], Z2[vam], M2[vam], c2(vam), ktrue[vam], 0, epochs, device, hidden, n_layers, seed=seed + 1)
+    metrics["flow_val_curve"] = h1; metrics["flow2_val_curve"] = h2
 
     # ---- closure on the test split
     idx = T.index[tm]; rng = np.random.default_rng(seed)
