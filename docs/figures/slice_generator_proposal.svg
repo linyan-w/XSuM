@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1010" viewBox="0 0 1180 1010" font-family="Helvetica, Arial, sans-serif" font-size="13">
-<rect width="1180" height="1010" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1215" viewBox="0 0 1180 1215" font-family="Helvetica, Arial, sans-serif" font-size="13">
+<rect width="1180" height="1215" fill="#fff"/>
 <defs><marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker></defs>
 <style>.box{stroke:#444;stroke-width:1.2;rx:6}.in{fill:#e3f0fb}.model{fill:#fdf1dc}.rule{fill:#ececec}.res{fill:#fff}.prop{fill:#fffbe6}
 .h{font-weight:bold;font-size:14px}.b{font-weight:bold;font-size:12px}.s{font-size:11px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}</style>
-<text x="20" y="28" class="h" font-size="17">Slice generator: the shipped scheme and the three two-stage variants tried   (2026-11-09)</text>
+<text x="20" y="28" class="h" font-size="17">Slice generator: the shipped scheme, the three two-stage variants and the vertex-residual variant tried   (2026-11-09)</text>
 <text x="20" y="48" class="cap">Each row generates one slice record from the truth; the PFP generator (unchanged, run m4_official_m3w0) then builds the PFP set from it. Numbers: CC1p0pi acceptance on test jobs 0-199.</text>
 <text x="20" y="78" class="h">1. Shipped slice generator  (run m2_official_m3)</text>
 <rect x="20" y="88" width="140" height="158" class="box in"/>
@@ -161,11 +161,46 @@
 <text x="870" y="814" class="s">Purity 0.396, eff 0.191 = the shipped chain.</text>
 <text x="870" y="829" class="s">At the M2 level no variant has the link (0.48-0.52 vs</text>
 <text x="870" y="844" class="s">0.446); M2s's chain 0.442 came from its distorted counts.</text>
-<rect x="20" y="900" width="1140" height="98" class="box res"/>
-<text x="32" y="920" class="h">Terms</text>
-<text x="32" y="938" class="s">always-present values: vertex, nu_score, bcfm_score, total_pe, longest-track direction / length / PID / chi2 (every slice has them).  optional groups: 2nd track (9 values),</text>
-<text x="32" y="952" class="s">two-track block (reco_t, opening angle, range momenta, 12 end points), charge in 1-4 cm spheres.  presence flags: has 2nd track, has two-track block, has sphere 1 / 2 / 3 / 4.</text>
-<text x="32" y="966" class="s">counts: n_pfp, n_prong, n_trk, n_proton, n_shower; 121 real combinations + other.  the link: in real data a slice whose longest track leaves the TPC tends to have fewer PFPs,</text>
-<text x="32" y="980" class="s">so CC Npi events with an exiting muon fall into n_pfp = 3 (the 2prong bin) more often.  Colours: blue truth input, orange learned model, grey deterministic rule, white result.</text>
-<text x="32" y="994" class="s">Models: particle encoder (code m3), slice generator (code m2), PFP generator (code m4).</text>
+<text x="20" y="898" class="h">5. Variant D tried  (run m2v): the shipped scheme with the vertex generated as the residual to the true vertex</text>
+<rect x="20" y="908" width="140" height="158" class="box in"/>
+<text x="30" y="926" class="b">Truth input</text>
+<text x="30" y="944" class="s">80 summary features</text>
+<text x="30" y="959" class="s">+ 64-d particle-encoder z</text>
+<text x="30" y="974" class="s">+ the true vertex, added</text>
+<text x="30" y="989" class="s">   back after the flow</text>
+<text x="30" y="1004" class="s">(no Geant4 quantities)</text>
+<line x1="160" y1="986" x2="175" y2="986" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="175" y="908" width="200" height="158" class="box model"/>
+<text x="185" y="926" class="b">Topology classifier</text>
+<text x="185" y="944" class="s">as row 1</text>
+<line x1="375" y1="986" x2="390" y2="986" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="390" y="908" width="200" height="158" class="box model"/>
+<text x="400" y="926" class="b">Presence classifiers</text>
+<text x="400" y="944" class="s">as row 1</text>
+<line x1="590" y1="986" x2="605" y2="986" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="605" y="908" width="230" height="158" class="box model"/>
+<text x="615" y="926" class="b">One flow: all slice values</text>
+<text x="615" y="944" class="s">as row 1, except the vertex:</text>
+<text x="615" y="959" class="s">asinh((reco - true) / 1 cm)</text>
+<text x="615" y="974" class="s">instead of the absolute position;</text>
+<text x="615" y="989" class="s">added back to the true vertex and</text>
+<text x="615" y="1004" class="s">clipped to the real range</text>
+<line x1="835" y1="986" x2="860" y2="986" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
+<rect x="860" y="908" width="300" height="158" class="box res"/>
+<text x="870" y="926" class="b">Result: vertex core fixed, link unchanged</text>
+<text x="870" y="944" class="s">reco - true vertex median 0.4 / 0.6 cm (exit / contained),</text>
+<text x="870" y="959" class="s">P(&gt; 5 cm) 0.18 / 0.31 (real 0.16 / 0.34; shipped 4-6 cm).</text>
+<text x="870" y="974" class="s">But CC Npi at n_pfp = 3, longest end in FV 0.502 (0.439).</text>
+<text x="870" y="989" class="s">Purity 0.397, eff 0.193 = the shipped chain.</text>
+<text x="870" y="1004" class="s">The rest of the link is in dirt neutrinos (3/5 of these</text>
+<text x="870" y="1019" class="s">slices): P(exit | reco vertex in FV) real 0.75, gen 0.55;</text>
+<text x="870" y="1034" class="s">exiting tracks end on the wall 0.51 real, 0.23 gen</text>
+<text x="870" y="1049" class="s">(M2w with wall targets: 0.51). Next: M2v + walls.</text>
+<rect x="20" y="1105" width="1140" height="98" class="box res"/>
+<text x="32" y="1125" class="h">Terms</text>
+<text x="32" y="1143" class="s">always-present values: vertex, nu_score, bcfm_score, total_pe, longest-track direction / length / PID / chi2 (every slice has them).  optional groups: 2nd track (9 values),</text>
+<text x="32" y="1157" class="s">two-track block (reco_t, opening angle, range momenta, 12 end points), charge in 1-4 cm spheres.  presence flags: has 2nd track, has two-track block, has sphere 1 / 2 / 3 / 4.</text>
+<text x="32" y="1171" class="s">counts: n_pfp, n_prong, n_trk, n_proton, n_shower; 121 real combinations + other.  the link: in real data a slice whose longest track leaves the TPC tends to have fewer PFPs,</text>
+<text x="32" y="1185" class="s">so CC Npi events with an exiting muon fall into n_pfp = 3 (the 2prong bin) more often.  Colours: blue truth input, orange learned model, grey deterministic rule, white result.</text>
+<text x="32" y="1199" class="s">Models: particle encoder (code m3), slice generator (code m2), PFP generator (code m4).</text>
 </svg>

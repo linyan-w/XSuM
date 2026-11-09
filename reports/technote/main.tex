@@ -492,11 +492,27 @@ resolution: the reco--true displacement has a median of 0.4--0.6\,cm in \real{} 
 the downstream and side walls, so the 4\,cm smear pushes them out of the FV. The vertex is generated as an absolute
 position under a robust linear scaling, which hides a 0.5\,cm core next to the 10\,cm-scale misplacements. A bigger
 topology head or muon--hadron angles as extra inputs do not change the link (\texttt{scripts/retrain\_topo\_head.py},
-\texttt{diag\_m2\_link\_angles.py}). Fix to try: generate the vertex as the residual to the true vertex on an asinh
-scale of about 1\,cm.
+\texttt{diag\_m2\_link\_angles.py}).
+
+\paragraph{Vertex as a residual (M2v).} The shipped configuration retrained with the three vertex columns entering
+the flow as $\sinh^{-1}((\mathrm{reco}-\mathrm{true})/1\,\mathrm{cm})$, added back to the true vertex and clipped
+to the real range at generation (\texttt{--vtx-resid}). The vertex core is fixed: displacement median 0.4 / 0.6\,cm,
+P($>5$\,cm) 0.175 / 0.307 (\real{} 0.159 / 0.338), tails unchanged; the reco FV pass of $n_\mathrm{pfp}=3$ slices
+with the true vertex in the FV is 0.950 (exit) / 0.967 (contained) against \real{} 0.975 / 0.958 (shipped 0.932 /
+0.968). The acceptance is the shipped chain (0.193 / 0.397) and the CC N$\pi$ exit fraction at $n_\mathrm{pfp}=3$
+is 0.502. The remaining link sits in the \emph{dirt} slices (true vertex outside the active volume, three fifths of
+the CC + pion $n_\mathrm{pfp}=3$ slices after the reco-vertex and nu\_score cuts): in \real{} a dirt slice whose
+longest track exits has its reco vertex inside the FV 0.32 of the time and 0.12 when the track is contained; the
+generators give 0.25--0.28 / 0.18--0.20 (\texttt{scripts/diag\_m2\_vtx\_dir.py}). The reco vertex position itself
+(on the muon line at the entry wall for 0.31, off the line for 0.67, position along the chord) is reproduced; what is
+missing is the longest track given the vertex: P(exit | reco vertex in FV) 0.750 \real{}, 0.552 M2v, and \real{}
+exiting tracks have a length equal to the path to the wall within 5\% for 0.51 against 0.23 (M2v), 0.26 (shipped),
+0.51 (M2w, the wall-target variant, \texttt{diag\_m2\_vtx\_dirt.py}). The dirt link is the wall relation of the
+longest track; M2w restores it but kept the 4--6\,cm vertex core. The two fixes act on different zones and have not
+been combined (M2v + wall targets).
 
 \begin{figure}[h]\centering\includegraphics[width=\textwidth]{slice_generator_proposal.pdf}
-\caption{The slice generator (M2): shipped scheme and the three two-stage variants tried. Numbers from the
+\caption{The slice generator (M2): shipped scheme, the three two-stage variants and the vertex-residual variant tried. Numbers from the
 CC1p0pi acceptance on test jobs 0--199.}\label{fig:slicegen}\end{figure}
 
 \begin{table}[h]\centering\small
@@ -568,8 +584,10 @@ and production-format surrogated datasets for the analysers. Remaining:
       $n_\mathrm{pfp}$--exit link but breaks the joint PFP counts; with the counts as a one-hot topology class in
       stage 1 (M2o) the counts are right but the link is lost; with the class from a classifier on the generated
       stage 1 (M2c) the counts are right and the acceptance equals the shipped chain, the link still missing.
-      The link is the reco-vertex resolution (core 4--6\,cm generated against 0.5\,cm \real{}): generate the vertex
-      as the residual to the true vertex on an asinh scale.
+      The link has two parts: the reco-vertex resolution for true vertices in the FV (core 4--6\,cm generated
+      against 0.5\,cm \real{}), fixed by generating the vertex as the residual to the true vertex (M2v, acceptance
+      unchanged on its own), and the wall relation of the longest track for dirt neutrinos (three fifths of the CC
+      N$\pi$ $n_\mathrm{pfp}=3$ slices), restored by the wall targets (M2w). Next: the two combined.
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and

@@ -257,3 +257,52 @@ So the exit <-> n_pfp link of the acceptance study is a property of the reco ver
 and the generator's vertex core is 10x too wide. The vertex columns are generated as absolute positions with a
 robust linear scaling, so a 0.5 cm core next to a 10-cm-scale distribution of misplacements is invisible to the flow.
 Fix: generate the vertex as the residual to the true vertex with an asinh scale of ~1 cm (and keep the wall spikes).
+
+## M2v: the vertex generated as the residual to the true vertex (`--vtx-resid`; `accept_m2v.txt`, `diag_m2v_summary.txt`, `m2_purity_m2v.txt`, `topo_m2v.txt`, `link_m2v.txt`), 2026-11-09
+
+Shipped configuration (60 epochs, 6 x 1024, 3M slices, run `m2_official_m2v`) with the three vertex columns entering
+the flow as asinh((reco - true) / 1 cm); at generation the true vertex is added back and the result clipped to the
+real training range (`pipeline_m2v.sh`, PFPs from the shipped M3w0, dataset `surrogate_official_m2v_pfp`, jobs 0-199).
+
+The vertex core is fixed. `link_m2v.txt` section 8, n_pfp=3 CC + pion slices with the true vertex in the FV: reco-true
+displacement median 0.4 (exit) / 0.6 cm (contained), P(> 5 cm) 0.175 / 0.307 (real 0.159 / 0.338; shipped 4-6 cm,
+0.43 / 0.56); the tails are unchanged. The reco FV pass is 0.950 (exit) / 0.967 (contained) against real 0.975 /
+0.958 (shipped 0.932 / 0.968): the reversal is halved, not gone. `scripts/diag_m2_vtx_dir.py` (`vtx_dir_m2v.txt`):
+the displacement components along the longest track and towards the nearest wall match real, yet exiting slices fail
+the FV more than real at every true wall distance, including > 50 cm.
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 (shipped) | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| M2v | 3,741 | 0.193 / 0.397 | 0.538 / 0.346 | 0.105 / 0.859 |
+
+The acceptance is the shipped chain. CC Npi at n_pfp=3, longest end in FV: 0.502 (real 0.439, shipped ~0.49). The M2
+link: real +0.025, M2v +0.012 (shipped +0.010); with the truth-predicted exit real +0.034, M2v +0.001.
+
+Where the rest of the link is: the zone of the TRUE vertex (`vtx_dir_m2v.txt`, same table for `m3`, `m2w`, `m2c`).
+P(reco vertex in FV | exit / contained) for n_pfp=3 CC + pion slices with a longest track and nu_score > 0.45:
+
+| true vertex | share of n_pfp=3 | real exit / cont | shipped | M2w | M2c | M2v |
+|---|---|---|---|---|---|---|
+| in FV | 0.30 | 0.982 / 0.965 | 0.941 / 0.967 | 0.947 / 0.968 | 0.972 / 0.983 | 0.957 / 0.967 |
+| in AV, outside FV | 0.09 | 0.061 / 0.176 | 0.096 / 0.234 | 0.094 / 0.186 | 0.077 / 0.203 | 0.061 / 0.164 |
+| outside AV (dirt) | 0.61 | 0.316 / 0.123 | 0.275 / 0.196 | 0.281 / 0.178 | 0.274 / 0.175 | 0.250 / 0.190 |
+| all | | 0.465 / 0.401 | 0.435 / 0.447 | 0.433 / 0.448 | 0.438 / 0.435 | 0.426 / 0.434 |
+
+Contribution of each zone to P(FV | exit) - P(FV | cont): real in-FV -0.046, dirt +0.108; the generators give the dirt
+zone +0.034 (shipped), +0.059 (M2w), +0.051 (M2c), +0.021 (M2v). Three fifths of the CC + pion n_pfp=3 slices at this
+stage are from neutrinos outside the active volume, and that zone carries the link: in real a dirt slice whose
+longest track exits has its reco vertex inside the FV 0.32 of the time, 0.12 when the track is contained.
+
+`scripts/diag_m2_vtx_dirt.py` (`vtx_dirt_m2v.txt`, `_m3`, `_m2w`; true muon direction from the primary set, diagnostic
+only) looks at the dirt slices whose true muon line enters the AV (76%): the reco vertex sits on the muon line at the
+entry wall for 0.31 of them (P(FV) 0.006), off the line by > 5 cm for 0.67 (P(FV) 0.23), and these fractions and the
+position along the chord are reproduced by every generator (M2v 0.24 / 0.75). What differs is the longest track given
+the vertex: real P(exit | reco vertex in FV) 0.750, M2v 0.552 (shipped 0.604, M2w 0.686); real exiting tracks have
+length = path to the AV wall within 5% for 0.51 of them, M2v 0.23 (shipped 0.26, M2w 0.51); among in-FV dirt slices
+0.38 real, M2v 0.09, M2w 0.36. So the dirt link is the wall relation of the longest track (a piece of a through-going
+muon from a mid-track vertex ends on the wall), which the wall targets of M2w restore at the marginal level; M2w's
+acceptance (0.185 / 0.390) did not improve because its vertex core was still 4-6 cm and its per-event wall assignment
+was 0.56 (above). The two fixes act on different zones (vertex residual: true vertex in FV; wall targets: dirt) and
+have not been combined. Next, if approved: M2v + `--walls` (the shipped configuration with both), M2vw.

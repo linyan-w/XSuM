@@ -1,0 +1,36 @@
+Running as unit: xsum-vtxdir2-m2v.service
+
+CC + pion, true vertex in FV, nu_score > 0.45, n_pfp = 3: displacement components and FV pass by reco exit   [real | gen]
+   real exit  n   974  FV pass 0.983 | along track: median -0.02 cm  P(along > 2) 0.049  P(along < -2) 0.116 | towards nearest wall: median -0.01  P(> 2) 0.050  P(< -2) 0.087 | true vertex < 10 cm from a wall: frac 0.190  FV pass 0.957  P(|d| > 5) 0.157
+   real cont  n  1085  FV pass 0.965 | along track: median -0.09 cm  P(along > 2) 0.066  P(along < -2) 0.258 | towards nearest wall: median -0.02  P(> 2) 0.130  P(< -2) 0.149 | true vertex < 10 cm from a wall: frac 0.097  FV pass 0.895  P(|d| > 5) 0.276
+   gen  exit  n   985  FV pass 0.957 | along track: median -0.03 cm  P(along > 2) 0.077  P(along < -2) 0.122 | towards nearest wall: median -0.02  P(> 2) 0.068  P(< -2) 0.092 | true vertex < 10 cm from a wall: frac 0.173  FV pass 0.918  P(|d| > 5) 0.141
+   gen  cont  n  1107  FV pass 0.967 | along track: median -0.09 cm  P(along > 2) 0.071  P(along < -2) 0.234 | towards nearest wall: median -0.01  P(> 2) 0.116  P(< -2) 0.138 | true vertex < 10 cm from a wall: frac 0.112  FV pass 0.871  P(|d| > 5) 0.258
+
+CC + pion, true vertex in FV, nu_score > 0.45, all n_pfp: displacement components and FV pass by reco exit   [real | gen]
+   real exit  n 10754  FV pass 0.991 | along track: median +0.01 cm  P(along > 2) 0.043  P(along < -2) 0.043 | towards nearest wall: median +0.00  P(> 2) 0.026  P(< -2) 0.040 | true vertex < 10 cm from a wall: frac 0.156  FV pass 0.970  P(|d| > 5) 0.069
+   real cont  n 11575  FV pass 0.988 | along track: median -0.02 cm  P(along > 2) 0.044  P(along < -2) 0.088 | towards nearest wall: median -0.00  P(> 2) 0.049  P(< -2) 0.061 | true vertex < 10 cm from a wall: frac 0.097  FV pass 0.956  P(|d| > 5) 0.101
+   gen  exit  n 10376  FV pass 0.985 | along track: median +0.01 cm  P(along > 2) 0.045  P(along < -2) 0.046 | towards nearest wall: median +0.00  P(> 2) 0.032  P(< -2) 0.038 | true vertex < 10 cm from a wall: frac 0.153  FV pass 0.963  P(|d| > 5) 0.079
+   gen  cont  n 12032  FV pass 0.990 | along track: median -0.01 cm  P(along > 2) 0.043  P(along < -2) 0.082 | towards nearest wall: median +0.00  P(> 2) 0.046  P(< -2) 0.056 | true vertex < 10 cm from a wall: frac 0.102  FV pass 0.958  P(|d| > 5) 0.101
+
+FV pass rate vs the true distance to the nearest wall (n_pfp = 3, nu_score > 0.45), by reco exit   [real exit / cont | gen exit / cont]
+   d_wall   0-  2 cm | 0.957 (  47) / 0.850 (  20) | 0.833 (  36) / 0.893 (  28)
+   d_wall   2-  5 cm | 0.941 (  68) / 0.939 (  33) | 0.917 (  60) / 0.800 (  45)
+   d_wall   5- 10 cm | 0.971 (  70) / 0.885 (  52) | 0.959 (  74) / 0.922 (  51)
+   d_wall  10- 20 cm | 0.972 ( 142) / 0.964 ( 111) | 0.924 ( 145) / 0.953 ( 106)
+   d_wall  20- 50 cm | 0.990 ( 289) / 0.964 ( 308) | 0.970 ( 303) / 0.972 ( 321)
+   d_wall  50-200 cm | 0.994 ( 358) / 0.979 ( 561) | 0.978 ( 367) / 0.989 ( 556)
+
+P(reco vertex in FV) for n_pfp = 3 CC + pion slices with a longest track and nu_score > 0.45, by where the TRUE vertex is and by reco exit   [real exit / cont | gen exit / cont]
+   true vertex in FV      | 0.983 (  974) / 0.965 ( 1085) | 0.957 (  985) / 0.967 ( 1107)
+   in AV, outside FV      | 0.061 (  478) / 0.176 (  125) | 0.061 (  489) / 0.164 (  146)
+   outside AV             | 0.296 ( 2066) / 0.112 ( 2114) | 0.250 ( 1956) / 0.190 ( 2253)
+   all                    | 0.454 ( 3518) / 0.393 ( 3324) | 0.426 ( 3430) / 0.434 ( 3506)
+   contribution of each zone to P(FV | exit) - P(FV | cont): zone share x pass-rate difference   [real | gen]
+   true vertex in FV      | -0.0430  (share exit 0.277 cont 0.326) | -0.0305  (share exit 0.287 cont 0.316)
+   in AV, outside FV      | +0.0016  (share exit 0.136 cont 0.038) | +0.0019  (share exit 0.143 cont 0.042)
+   outside AV             | +0.1027  (share exit 0.587 cont 0.636) | +0.0208  (share exit 0.570 cont 0.643)
+Finished with result: success
+Main processes terminated with: code=exited/status=0
+Service runtime: 1.366s
+CPU time consumed: 3.564s
+Memory peak: 2.0M

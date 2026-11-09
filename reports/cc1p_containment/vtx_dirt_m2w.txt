@@ -1,0 +1,19 @@
+out-of-AV CC + pion slices with a longest track: 18450; the true muon line enters the AV for 0.762 of them; chord length median 354 cm
+
+real: n_pfp = 3, nu_score > 0.45, out-of-AV, muon line enters the AV: n 3295  P(exit) 0.482  P(reco vertex in FV) 0.185  P(FV | exit) 0.286  P(FV | cont) 0.091  P(exit | FV) 0.745  P(exit | not FV) 0.422
+   exit    n  1587 | perp to the muon line: median    9.3 cm  P(< 5) 0.355 | along from the entry point / chord: q25 -0.01 med +0.00 q75 +0.12  P(< 0.05) 0.672 | |cos(reco long dir, true mu)| > 0.95: 0.810 | len / path to wall in 0.95-1.05: 0.550  P(< 0.8) 0.101
+   cont    n  1708 | perp to the muon line: median   10.6 cm  P(< 5) 0.369 | along from the entry point / chord: q25 -0.01 med -0.00 q75 +0.00  P(< 0.05) 0.919 | |cos(reco long dir, true mu)| > 0.95: 0.866 | len / path to wall in 0.95-1.05: 0.002  P(< 0.8) 0.923
+   in FV   n   609 | perp to the muon line: median   25.8 cm  P(< 5) 0.080 | along from the entry point / chord: q25 +0.05 med +0.15 q75 +0.32  P(< 0.05) 0.238 | |cos(reco long dir, true mu)| > 0.95: 0.535 | len / path to wall in 0.95-1.05: 0.401  P(< 0.8) 0.256
+   not FV  n  2686 | perp to the muon line: median    7.3 cm  P(< 5) 0.426 | along from the entry point / chord: q25 -0.01 med -0.00 q75 +0.00  P(< 0.05) 0.927 | |cos(reco long dir, true mu)| > 0.95: 0.908 | len / path to wall in 0.95-1.05: 0.236  P(< 0.8) 0.588
+   on the muon line, inside the chord: n    59  P(FV) 0.729  P(exit) 0.814  P(exit | collinear) 0.846  P(collinear) 0.881  len/path in 0.95-1.05 0.356
+   on the muon line, at the entry wall:    n  1130  P(FV) 0.005  P(exit) 0.452  P(collinear) 0.966
+   off the muon line (> 5 cm):             n  2102  P(FV) 0.266  P(exit) 0.487
+
+gen: n_pfp = 3, nu_score > 0.45, out-of-AV, muon line enters the AV: n 3260  P(exit) 0.502  P(reco vertex in FV) 0.210  P(FV | exit) 0.287  P(FV | cont) 0.132  P(exit | FV) 0.686  P(exit | not FV) 0.453
+   exit    n  1637 | perp to the muon line: median   16.7 cm  P(< 5) 0.147 | along from the entry point / chord: q25 -0.01 med +0.01 q75 +0.13  P(< 0.05) 0.630 | |cos(reco long dir, true mu)| > 0.95: 0.762 | len / path to wall in 0.95-1.05: 0.508  P(< 0.8) 0.161
+   cont    n  1623 | perp to the muon line: median   16.9 cm  P(< 5) 0.189 | along from the entry point / chord: q25 -0.02 med -0.00 q75 +0.01  P(< 0.05) 0.888 | |cos(reco long dir, true mu)| > 0.95: 0.853 | len / path to wall in 0.95-1.05: 0.001  P(< 0.8) 0.919
+   in FV   n   685 | perp to the muon line: median   32.1 cm  P(< 5) 0.031 | along from the entry point / chord: q25 +0.05 med +0.13 q75 +0.29  P(< 0.05) 0.247 | |cos(reco long dir, true mu)| > 0.95: 0.575 | len / path to wall in 0.95-1.05: 0.356  P(< 0.8) 0.312
+   not FV  n  2575 | perp to the muon line: median   13.9 cm  P(< 5) 0.204 | along from the entry point / chord: q25 -0.02 med -0.00 q75 +0.01  P(< 0.05) 0.894 | |cos(reco long dir, true mu)| > 0.95: 0.869 | len / path to wall in 0.95-1.05: 0.229  P(< 0.8) 0.599
+   on the muon line, inside the chord: n    27  P(FV) 0.593  P(exit) 0.815  P(exit | collinear) 0.850  P(collinear) 0.741  len/path in 0.95-1.05 0.333
+   on the muon line, at the entry wall:    n   520  P(FV) 0.010  P(exit) 0.419  P(collinear) 0.948
+   off the muon line (> 5 cm):             n  2713  P(FV) 0.245  P(exit) 0.515
