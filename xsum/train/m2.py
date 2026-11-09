@@ -398,7 +398,7 @@ def report(real, gen, T, tm, L, kgen, ktrue, metrics, out):
 
 
 def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hidden=512, n_layers=5, card_table=None, walls=False,
-        topo_last=False, range_curve=False, two_stage=False):
+        topo_last=False, range_curve=False, two_stage=False, topo_onehot=False):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
     then table_dir is expected to hold matched slices only (see scripts/split_official_table.py).
     Defaults = the shipped M2 (m2_official_m3). Studies (technote Sec. 8): walls (M2w), topo_last + range_curve (M2t).
@@ -409,7 +409,10 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     range_curve: range momenta flagged on / off the length-momentum curve (RANGE_SPEC, apply_range).
     two_stage: stage 1 = one flow over the always-present block, the PFP counts and the group-presence flags; stage 2 =
     a flow over the optional groups conditioned on the truth and the stage-1 block, masked by the stage-1 presence
-    (run_two_stage)."""
+    (run_two_stage).
+    topo_onehot (with two_stage): the PFP counts enter stage 1 as the topology class (joint count tuple), a one-hot
+    over the classes dequantised to +-1 +- U(0.8), decoded by argmax, instead of five dequantised integers; generated
+    slices then carry only count tuples of the real table."""
     out = pathlib.Path(out_dir); (out / "figures").mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     tcols = ["matched", "n_matched_slices"] + [c for c, _, _ in SPEC] + TOPO_COLS + FLAGS
@@ -474,7 +477,8 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     print(f"restricted to {len(F)} matched slices", flush=True); mem("after load")
 
     if two_stage:
-        return run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0)
+        return run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0,
+                             topo_onehot=topo_onehot)
     curves = None
     if range_curve:
         curves = fit_range_curves(T[tr]); T = add_range_targets(T, curves)
@@ -576,21 +580,30 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
     return metrics
 
 
-def stage_specs(walls, range_curve):
-    """(stage-1 spec, stage-2 spec) of the two-stage M2."""
+def stage_specs(walls, range_curve, topo_onehot=False):
+    """(stage-1 spec, stage-2 spec) of the two-stage M2; with topo_onehot the counts are not in the spec (one-hot block)."""
     full = SPEC + (WALL_SPEC if walls else []) + (RANGE_SPEC if range_curve else [])
-    s1 = [x for x in full if x[2] == "base"] + [(c, "count", "base") for c in TOPO_COLS] + [(f"has_{g}", "flag", "base") for g in GROUPS]
+    cnt = [] if topo_onehot else [(c, "count", "base") for c in TOPO_COLS]
+    s1 = [x for x in full if x[2] == "base"] + cnt + [(f"has_{g}", "flag", "base") for g in GROUPS]
     return s1, [x for x in full if x[2] != "base"]
 
 
-def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0):
+ONEHOT_NOISE = 0.8   # one-hot block: 2 H - 1 + U(-0.8, 0.8); the true class stays the argmax
+
+
+def onehot_block(k, n, rng):
+    return (2.0 * np.eye(n, dtype=np.float32)[k] - 1.0 + rng.uniform(-ONEHOT_NOISE, ONEHOT_NOISE, (len(k), n))).astype(np.float32)
+
+
+def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs, hidden, n_layers, seed, walls, range_curve, names, std, t0,
+                  topo_onehot=False):
     matched = np.ones(len(T), dtype=bool); trm, vam, tm = tr & matched, va & matched, te & matched
     curves = None
     if range_curve:
         curves = fit_range_curves(T[tr]); T = add_range_targets(T, curves)
     P = presence(T, None)
     for g in GROUPS: T[f"has_{g}"] = P[g].astype(np.float32)
-    s1, s2 = stage_specs(walls, range_curve); bt1, bt2 = BlockTransform(s1), BlockTransform(s2)
+    s1, s2 = stage_specs(walls, range_curve, topo_onehot); bt1, bt2 = BlockTransform(s1), BlockTransform(s2)
     Y = bt1.matrix(T, seed).astype(np.float32); bt1.fit(Y[trm]); Z1, M1 = bt1.standardise(Y); del Y
     Y = bt2.matrix(T, seed + 1).astype(np.float32); bt2.fit(Y[trm]); Z2, M2 = bt2.standardise(Y); del Y
     M2 = mask_from_presence(P, bt2) * M2
@@ -599,7 +612,11 @@ def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs
         bt = bt1 if c in bt1.cols else bt2; Mx = M1 if c in bt1.cols else M2
         v = T[c].to_numpy(); Sreal[c] = test(np.nan_to_num(v, nan=1e9)) & np.isfinite(v); Mx[Sreal[c], bt.cols.index(c)] = 0.0
     topo = Topology(T, trm); ktrue = topo.encode(T)
-    metrics["two_stage"] = {"dim1": len(s1), "dim2": len(s2)}
+    bt1.n_onehot = topo.other + 1 if topo_onehot else 0
+    if topo_onehot:                               # counts as the topology class, appended after the stage-1 columns
+        Z1 = np.concatenate([Z1, onehot_block(ktrue, bt1.n_onehot, np.random.default_rng(seed + 2))], 1)
+        M1 = np.concatenate([M1, np.ones((len(M1), bt1.n_onehot), dtype=np.float32)], 1)
+    metrics["two_stage"] = {"dim1": Z1.shape[1], "dim2": len(s2), "n_onehot": bt1.n_onehot}
     pres = {}
     def fit_head(name, y, m, Xin):
         rows = np.flatnonzero(tr & m)
@@ -625,7 +642,7 @@ def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs
     idx = T.index[tm]; rng = np.random.default_rng(seed)
     gen = sample_two_stage(f1, f2, bt1, bt2, heads, topo, X[tm], C[tm], F[tm], idx, device, rng, curves)
     kgen = topo.encode(gen)
-    real = pd.concat([bt1.frame(Z1[tm], M1[tm], idx), bt2.frame(Z2[tm], M2[tm], idx)], axis=1)
+    nb = len(bt1.cols); real = pd.concat([bt1.frame(Z1[tm][:, :nb], M1[tm][:, :nb], idx), bt2.frame(Z2[tm], M2[tm], idx)], axis=1)
     for c in TOPO_COLS: real[c] = T[c].to_numpy()[tm]
     for c, (test, value) in SPIKES.items(): real.loc[Sreal[c][tm], c] = T[c].to_numpy()[tm][Sreal[c][tm]]
     for fl in FLAGS: real[fl] = T[fl].to_numpy()[tm]
@@ -638,7 +655,7 @@ def run_two_stage(T, X, C, F, L, tr, va, te, heads, metrics, out, device, epochs
     report(real, gen, T, tm, L, kgen, ktrue, metrics, out)
     torch.save({"two_stage": True, "state1": f1.state_dict(), "state2": f2.state_dict(), "dim1": Z1.shape[1], "dim2": Z2.shape[1], "cond_dim": C.shape[1],
                 "spec1": bt1.spec, "spec2": bt2.spec, "bt1": (bt1.med, bt1.mad), "bt2": (bt2.med, bt2.mad), "range_curves": curves,
-                "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers,
+                "topology_classes": topo.classes, "topology_other_pool": topo.other_pool, "hidden": hidden, "n_layers": n_layers, "n_onehot": bt1.n_onehot,
                 "std_m": std.m, "std_s": std.s, "features": names, "spec": bt1.spec + bt2.spec}, out / "model.pt")
     import pickle
     pickle.dump(heads, open(out / "heads.pkl", "wb"))
@@ -655,8 +672,13 @@ def sample_two_stage(f1, f2, bt1, bt2, heads, topo, X, C, Fv, idx, device, rng, 
     for c, (test, value) in SPIKES.items():
         if c in bt1.cols:
             S[c] = rng.random(n) < heads["spike_" + c].predict_proba(X)[:, 1]; M1[S[c], bt1.cols.index(c)] = 0.0
+    no = getattr(bt1, "n_onehot", 0)
+    if no: M1 = np.concatenate([M1, np.ones((n, no), dtype=np.float32)], 1)
     Z1 = sample_flow(f1, C, M1, device, n_steps=n_steps)
-    g1 = bt1.frame(Z1, M1, idx)
+    nb = len(bt1.cols); g1 = bt1.frame(Z1[:, :nb], M1[:, :nb], idx)
+    if no:                                        # counts = the decoded topology class (only real count tuples)
+        cnt = topo.decode(Z1[:, nb:].argmax(1), rng)
+        for c in TOPO_COLS: g1[c] = cnt[c].to_numpy()
     # hard relations of the real reco (never violated in the real table): counts nested, a short track whenever
     # n_trk >= 2, the cohpi two-track block only for n_prong = n_trk = 2; the rate of fixes is kept as a diagnostic
     fix = {}

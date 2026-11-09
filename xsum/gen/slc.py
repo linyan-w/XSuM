@@ -33,6 +33,7 @@ class Surrogate:
         if self.two_stage:            # stage 1 (block + counts + presence), stage 2 (optional groups)
             self.bt1, self.bt2 = BlockTransform(ck["spec1"]), BlockTransform(ck["spec2"])
             (self.bt1.med, self.bt1.mad), (self.bt2.med, self.bt2.mad) = ck["bt1"], ck["bt2"]
+            self.bt1.n_onehot = int(ck.get("n_onehot", 0))   # counts as a one-hot topology class in stage 1
             self.f1 = FlowMatcher(ck["dim1"], ck["cond_dim"], ck["hidden"], ck["n_layers"]).to(device)
             self.f2 = FlowMatcher(ck["dim2"], ck["cond_dim"] + ck["dim1"], ck["hidden"], ck["n_layers"]).to(device)
             self.f1.load_state_dict(ck["state1"]); self.f2.load_state_dict(ck["state2"]); self.f1.eval(); self.f2.eval()
