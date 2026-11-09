@@ -190,4 +190,27 @@ tuple distribution 0.092 (M2s 0.170). But the argmax over 121 classes overweight
 and the targeted link is lost again: CC Npi at n_pfp=3 longest end in FV 0.515 (real 0.439, M2s 0.442). Rule fixes:
 short-for-n_trk=2 3.3%, two-outside-2trk 1.1%; cohpi SR 89 vs real 156 (M2s 104).
 
-Schematic of the shipped slice generator, the two variants and the proposal: `docs/figures/slice_generator_proposal.svg`.
+Schematic of the shipped slice generator and the three variants: `docs/figures/slice_generator_proposal.svg`.
+
+## M2c: two-stage M2, topology class from a classifier on truth + generated stage 1 (`--two-stage --topo-cls --walls --range-curve`), 2026-11-09
+
+`accept_m2c.txt`, `diag_m2c_summary.txt`, `m2_purity_m2c.txt`, `topo_m2c.txt` (dataset `surrogate_official_m2c_pfp`, jobs 0-199).
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| M2s | 3,198 | 0.165 / 0.396 | 0.454 / 0.342 | 0.090 / 0.876 |
+| M2o | 3,511 | 0.170 / 0.371 | 0.462 / 0.317 | 0.090 / 0.847 |
+| M2c | 3,702 | 0.191 / 0.396 | 0.525 / 0.343 | 0.107 / 0.877 |
+
+Counts fixed: tuple TV distance to real 0.017 (shipped 0.015, M2s 0.170, M2o 0.092), (3,2,2,*,0) 0.436 of n_pfp=3
+(real 0.439), P(PFP 2prong | n_pfp=3) 0.970 for signal (real 0.971), n_pfp >= 6 0.083 (0.084); presence rates within
+0.006; no slice without a compatible class, rule fixes <= 3e-4; cohpi 2trk 20203 vs 20116, SR 138 vs 156.
+Link not closed: CC Npi at n_pfp=3 longest end in FV 0.488 (real 0.439; shipped 0.49). Acceptance equals the shipped
+chain (0.191 / 0.396 vs 0.191 / 0.394).
+
+Re-reading M2s: at the M2 level (test slices, truth CC + pion, vertex in FV, nu_score > 0.45, n_pfp=3) the longest
+track ends in the FV for 0.486 (M2w 0.483, M2o 0.521, M2c 0.480; real 0.446). M2s's chain value 0.442 was therefore
+not a closed link but the distorted n_pfp=3 population (P(2prong | n_pfp=3) 0.73 for CC Npi). No variant has
+reproduced the real correlation between the longest-track exit and the PFP count.
