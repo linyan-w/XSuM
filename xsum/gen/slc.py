@@ -35,9 +35,12 @@ class Surrogate:
             (self.bt1.med, self.bt1.mad), (self.bt2.med, self.bt2.mad) = ck["bt1"], ck["bt2"]
             self.bt1.n_onehot = int(ck.get("n_onehot", 0))   # counts as a one-hot topology class in stage 1
             self.f1 = FlowMatcher(ck["dim1"], ck["cond_dim"], ck["hidden"], ck["n_layers"]).to(device)
-            self.f2 = FlowMatcher(ck["dim2"], ck["cond_dim"] + ck["dim1"], ck["hidden"], ck["n_layers"]).to(device)
+            self.f2 = FlowMatcher(ck["dim2"], ck.get("cond2_dim", ck["cond_dim"] + ck["dim1"]), ck["hidden"], ck["n_layers"]).to(device)
             self.f1.load_state_dict(ck["state1"]); self.f2.load_state_dict(ck["state2"]); self.f1.eval(); self.f2.eval()
-            self.topo_last = False
+            self.topo_last = False; self.topo_head = None
+            if ck.get("topo_cls"):            # topology class from the truth and the generated stage-1 block
+                th = torch.load(f"{d}/topology_head.pt", map_location=device, weights_only=False)
+                self.topo_head = MLPClassifier(th["n_in"], th["n_classes"], device=device); self.topo_head.net.load_state_dict(th["state"])
             return
         self.bt = BlockTransform(ck["spec"]); self.bt.med, self.bt.mad = ck["bt_med"], ck["bt_mad"]
         self.flow = FlowMatcher(ck["dim"], ck["cond_dim"], ck["hidden"], ck["n_layers"]).to(device)
@@ -65,7 +68,7 @@ def generate(sur: Surrogate, F: pd.DataFrame, seed: int = 0, cardinality: bool =
     Xr = X[rows]; C = sur.standardise(Xr); Fr = F.iloc[rows]
     if sur.two_stage:
         idx = pd.MultiIndex.from_arrays([F.index.get_level_values(i)[rows] for i in range(F.index.nlevels)] + [draw], names=list(F.index.names) + ["draw"])
-        out = sample_two_stage(sur.f1, sur.f2, sur.bt1, sur.bt2, sur.heads, sur.topo, Xr, C, Fr, idx, sur.device, rng, sur.range_curves, n_steps=n_steps)
+        out = sample_two_stage(sur.f1, sur.f2, sur.bt1, sur.bt2, sur.heads, sur.topo, Xr, C, Fr, idx, sur.device, rng, sur.range_curves, n_steps=n_steps, topo_head=sur.topo_head)
         return out.drop(columns=[c for c in out.columns if c.startswith("has_")])
     if sur.topo_last:                 # topology sampled after the flow, from the truth features and the generated block
         Xpre, Cflow = Xr, C
