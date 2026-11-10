@@ -1,0 +1,30 @@
+
+CC + pion, true vertex in FV, nu_score > 0.45, n_pfp = 3: displacement components and FV pass by reco exit   [real | gen]
+   real exit  n   971  FV pass 0.982 | along track: median -0.02 cm  P(along > 2) 0.049  P(along < -2) 0.113 | towards nearest wall: median -0.00  P(> 2) 0.050  P(< -2) 0.084 | true vertex < 10 cm from a wall: frac 0.189  FV pass 0.957  P(|d| > 5) 0.152
+   real cont  n  1088  FV pass 0.965 | along track: median -0.09 cm  P(along > 2) 0.066  P(along < -2) 0.260 | towards nearest wall: median -0.02  P(> 2) 0.130  P(< -2) 0.152 | true vertex < 10 cm from a wall: frac 0.097  FV pass 0.896  P(|d| > 5) 0.283
+   gen  exit  n   970  FV pass 0.941 | along track: median -0.35 cm  P(along > 2) 0.237  P(along < -2) 0.311 | towards nearest wall: median -0.21  P(> 2) 0.229  P(< -2) 0.272 | true vertex < 10 cm from a wall: frac 0.178  FV pass 0.792  P(|d| > 5) 0.462
+   gen  cont  n  1108  FV pass 0.967 | along track: median -1.28 cm  P(along > 2) 0.203  P(along < -2) 0.437 | towards nearest wall: median -0.19  P(> 2) 0.254  P(< -2) 0.301 | true vertex < 10 cm from a wall: frac 0.106  FV pass 0.856  P(|d| > 5) 0.534
+
+CC + pion, true vertex in FV, nu_score > 0.45, all n_pfp: displacement components and FV pass by reco exit   [real | gen]
+   real exit  n 10752  FV pass 0.991 | along track: median +0.01 cm  P(along > 2) 0.043  P(along < -2) 0.043 | towards nearest wall: median +0.00  P(> 2) 0.026  P(< -2) 0.040 | true vertex < 10 cm from a wall: frac 0.156  FV pass 0.970  P(|d| > 5) 0.069
+   real cont  n 11577  FV pass 0.988 | along track: median -0.02 cm  P(along > 2) 0.044  P(along < -2) 0.089 | towards nearest wall: median -0.00  P(> 2) 0.049  P(< -2) 0.061 | true vertex < 10 cm from a wall: frac 0.097  FV pass 0.957  P(|d| > 5) 0.102
+   gen  exit  n 10407  FV pass 0.977 | along track: median -0.05 cm  P(along > 2) 0.224  P(along < -2) 0.241 | towards nearest wall: median -0.09  P(> 2) 0.182  P(< -2) 0.215 | true vertex < 10 cm from a wall: frac 0.155  FV pass 0.891  P(|d| > 5) 0.342
+   gen  cont  n 11987  FV pass 0.983 | along track: median -0.29 cm  P(along > 2) 0.212  P(along < -2) 0.283 | towards nearest wall: median -0.08  P(> 2) 0.205  P(< -2) 0.227 | true vertex < 10 cm from a wall: frac 0.101  FV pass 0.883  P(|d| > 5) 0.365
+
+FV pass rate vs the true distance to the nearest wall (n_pfp = 3, nu_score > 0.45), by reco exit   [real exit / cont | gen exit / cont]
+   d_wall   0-  2 cm | 0.957 (  47) / 0.850 (  20) | 0.676 (  37) / 0.714 (  28)
+   d_wall   2-  5 cm | 0.941 (  68) / 0.939 (  33) | 0.766 (  64) / 0.854 (  41)
+   d_wall   5- 10 cm | 0.971 (  69) / 0.887 (  53) | 0.875 (  72) / 0.939 (  49)
+   d_wall  10- 20 cm | 0.972 ( 142) / 0.964 ( 111) | 0.959 ( 147) / 0.953 ( 107)
+   d_wall  20- 50 cm | 0.990 ( 289) / 0.964 ( 308) | 0.973 ( 292) / 0.973 ( 330)
+   d_wall  50-200 cm | 0.994 ( 356) / 0.979 ( 563) | 0.980 ( 358) / 0.989 ( 553)
+
+P(reco vertex in FV) for n_pfp = 3 CC + pion slices with a longest track and nu_score > 0.45, by where the TRUE vertex is and by reco exit   [real exit / cont | gen exit / cont]
+   true vertex in FV      | 0.982 (  971) / 0.965 ( 1088) | 0.941 (  970) / 0.967 ( 1108)
+   in AV, outside FV      | 0.061 (  478) / 0.176 (  125) | 0.096 (  501) / 0.234 (  137)
+   outside AV             | 0.316 ( 2074) / 0.123 ( 2106) | 0.275 ( 2012) / 0.196 ( 2185)
+   all                    | 0.465 ( 3523) / 0.401 ( 3319) | 0.435 ( 3483) / 0.447 ( 3430)
+   contribution of each zone to P(FV | exit) - P(FV | cont): zone share x pass-rate difference   [real | gen]
+   true vertex in FV      | -0.0456  (share exit 0.276 cont 0.328) | -0.0501  (share exit 0.278 cont 0.323)
+   in AV, outside FV      | +0.0016  (share exit 0.136 cont 0.038) | +0.0045  (share exit 0.144 cont 0.040)
+   outside AV             | +0.1082  (share exit 0.589 cont 0.635) | +0.0340  (share exit 0.578 cont 0.637)

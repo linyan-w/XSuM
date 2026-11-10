@@ -1,0 +1,27 @@
+Running as unit: xsum-vtxdirt-m2v.service
+/home/lwan/SBND/XSuM/scripts/diag_m2_vtx_dirt.py:61: RuntimeWarning: divide by zero encountered in divide
+  path = np.minimum.reduce([np.maximum(t1, t2)[:, i] for i in range(3)]); ratio = S.long_trk_len.to_numpy(float) / path
+out-of-AV CC + pion slices with a longest track: 18450; the true muon line enters the AV for 0.762 of them; chord length median 354 cm
+
+real: n_pfp = 3, nu_score > 0.45, out-of-AV, muon line enters the AV: n 3295  P(exit) 0.477  P(reco vertex in FV) 0.170  P(FV | exit) 0.268  P(FV | cont) 0.081  P(exit | FV) 0.750  P(exit | not FV) 0.421
+   exit    n  1573 | perp to the muon line: median   12.1 cm  P(< 5) 0.323 | along from the entry point / chord: q25 -0.03 med +0.00 q75 +0.08  P(< 0.05) 0.713 | |cos(reco long dir, true mu)| > 0.95: 0.802 | len / path to wall in 0.95-1.05: 0.510  P(< 0.8) 0.170
+   cont    n  1722 | perp to the muon line: median   15.2 cm  P(< 5) 0.332 | along from the entry point / chord: q25 -0.04 med -0.01 q75 +0.00  P(< 0.05) 0.936 | |cos(reco long dir, true mu)| > 0.95: 0.873 | len / path to wall in 0.95-1.05: 0.002  P(< 0.8) 0.925
+   in FV   n   561 | perp to the muon line: median   30.9 cm  P(< 5) 0.078 | along from the entry point / chord: q25 +0.04 med +0.12 q75 +0.28  P(< 0.05) 0.299 | |cos(reco long dir, true mu)| > 0.95: 0.542 | len / path to wall in 0.95-1.05: 0.380  P(< 0.8) 0.255
+   not FV  n  2734 | perp to the muon line: median   10.2 cm  P(< 5) 0.379 | along from the entry point / chord: q25 -0.05 med -0.01 q75 +0.00  P(< 0.05) 0.939 | |cos(reco long dir, true mu)| > 0.95: 0.900 | len / path to wall in 0.95-1.05: 0.217  P(< 0.8) 0.628
+   on the muon line, inside the chord: n    56  P(FV) 0.679  P(exit) 0.839  P(exit | collinear) 0.878  P(collinear) 0.875  len/path in 0.95-1.05 0.339
+   on the muon line, at the entry wall:    n  1019  P(FV) 0.006  P(exit) 0.448  P(collinear) 0.964
+   off the muon line (> 5 cm):             n  2216  P(FV) 0.233  P(exit) 0.481
+
+gen: n_pfp = 3, nu_score > 0.45, out-of-AV, muon line enters the AV: n 3255  P(exit) 0.435  P(reco vertex in FV) 0.191  P(FV | exit) 0.243  P(FV | cont) 0.152  P(exit | FV) 0.552  P(exit | not FV) 0.407
+   exit    n  1415 | perp to the muon line: median   15.2 cm  P(< 5) 0.239 | along from the entry point / chord: q25 -0.04 med -0.00 q75 +0.10  P(< 0.05) 0.684 | |cos(reco long dir, true mu)| > 0.95: 0.775 | len / path to wall in 0.95-1.05: 0.227  P(< 0.8) 0.234
+   cont    n  1840 | perp to the muon line: median   19.1 cm  P(< 5) 0.260 | along from the entry point / chord: q25 -0.05 med -0.01 q75 +0.00  P(< 0.05) 0.865 | |cos(reco long dir, true mu)| > 0.95: 0.842 | len / path to wall in 0.95-1.05: 0.001  P(< 0.8) 0.917
+   in FV   n   623 | perp to the muon line: median   29.2 cm  P(< 5) 0.063 | along from the entry point / chord: q25 +0.05 med +0.13 q75 +0.28  P(< 0.05) 0.242 | |cos(reco long dir, true mu)| > 0.95: 0.613 | len / path to wall in 0.95-1.05: 0.088  P(< 0.8) 0.453
+   not FV  n  2632 | perp to the muon line: median   14.0 cm  P(< 5) 0.295 | along from the entry point / chord: q25 -0.05 med -0.01 q75 +0.00  P(< 0.05) 0.915 | |cos(reco long dir, true mu)| > 0.95: 0.860 | len / path to wall in 0.95-1.05: 0.101  P(< 0.8) 0.660
+   on the muon line, inside the chord: n    44  P(FV) 0.705  P(exit) 0.682  P(exit | collinear) 0.649  P(collinear) 0.841  len/path in 0.95-1.05 0.136
+   on the muon line, at the entry wall:    n   772  P(FV) 0.010  P(exit) 0.399  P(collinear) 0.946
+   off the muon line (> 5 cm):             n  2439  P(FV) 0.239  P(exit) 0.442
+Finished with result: success
+Main processes terminated with: code=exited/status=0
+Service runtime: 13.600s
+CPU time consumed: 11.271s
+Memory peak: 2.2M

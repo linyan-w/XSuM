@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1180" height="800" viewBox="0 0 1180 800" font-family="Helvetica, Arial, sans-serif" font-size="13">
+  <rect width="1180" height="800" fill="#fff"/>
   <defs>
     <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker>
   </defs>
@@ -8,7 +9,7 @@
     .h{font-weight:bold;font-size:14px}.s{font-size:11.5px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}
   </style>
 
-  <text x="20" y="28" class="h" font-size="17">XSuM as built (surrogate_official_m3w0_pfp, 2026-11-08): inputs, models, generated tables</text>
+  <text x="20" y="28" class="h" font-size="17">XSuM as shipped (surrogate_official_m3w0_pfp, 2026-11-09): inputs, models, generated tables</text>
   <text x="20" y="48" class="cap">one true neutrino interaction in, its reconstructed record out; tables are the XSuM cafpyana dataframes (mcnu, mcprim, mcdaught, slc, pfp)</text>
 
   <!-- INPUTS -->
@@ -39,14 +40,14 @@
   <!-- MODELS -->
   <text x="350" y="84" class="h">MODELS  (trained on the training files only)</text>
   <rect x="350" y="94" width="390" height="84" class="box model"/>
-  <text x="362" y="114" class="h">M3 particle-set encoder  (stage A, then frozen)</text>
+  <text x="362" y="114" class="h">Particle encoder  (code m3; trained first, then frozen)</text>
   <text x="362" y="132" class="s">transformer, 4 layers, d = 128, over particle tokens + a context</text>
   <text x="362" y="148" class="s">token (80 summary features) -> 64-d embedding z; trained on topology,</text>
   <text x="362" y="164" class="s">presence / containment flags and the slice block (3 M slices)</text>
 
   <rect x="350" y="190" width="390" height="134" class="box model"/>
-  <text x="362" y="210" class="h">M2 Tier 0: what exists   (input: 80 features + z)</text>
-  <text x="362" y="228" class="s">matched slices per neutrino 0 / 1 / 2+: GBDT</text>
+  <text x="362" y="210" class="h">Slice generator, step 1: what exists   (code m2)</text>
+  <text x="362" y="228" class="s">input 80 features + z; matched slices per neutrino 0 / 1 / 2+: GBDT</text>
   <text x="362" y="244" class="s">topology: softmax MLP over 121 classes of</text>
   <text x="362" y="260" class="s">   (n_pfp, n_prong, n_trk, n_proton, n_shower), sampled first</text>
   <text x="362" y="276" class="s">GBDT heads: second track, two-track block, charge in 1-4 cm</text>
@@ -54,12 +55,12 @@
   <text x="362" y="308" class="s">   point masses (vertex at walls, back-to-back pairs)</text>
 
   <rect x="350" y="336" width="390" height="68" class="box model"/>
-  <text x="362" y="356" class="h">M2 Tier 1: slice block  (~50 numbers)</text>
+  <text x="362" y="356" class="h">Slice generator, step 2: slice values  (~50 numbers)</text>
   <text x="362" y="374" class="s">conditional flow matching, MLP 6 x 1024, masked per event to</text>
   <text x="362" y="390" class="s">the groups that exist; conditioned on features, z, topology</text>
 
   <rect x="350" y="416" width="390" height="100" class="box model"/>
-  <text x="362" y="436" class="h">M4 Tier 2: PFP set of each slice</text>
+  <text x="362" y="436" class="h">PFP generator: the PFP set of each slice   (code m4)</text>
   <text x="362" y="454" class="s">softmax heads: number of fitted / unfitted PFPs; masked set flow</text>
   <text x="362" y="470" class="s">   (transformer, d = 256, 4 layers, no particle attention) over up to</text>
   <text x="362" y="486" class="s">   12 PFP tokens x 38 fields, incl. end displacement and per-axis</text>
@@ -68,7 +69,7 @@
   <!-- OUTPUTS -->
   <text x="780" y="84" class="h">SURROGATED DATAFRAMES  (production format)</text>
   <rect x="780" y="94" width="380" height="130" class="box out"/>
-  <text x="792" y="114" class="h">slc_0: generated   (M2)</text>
+  <text x="792" y="114" class="h">slc_0: generated   (slice generator)</text>
   <text x="792" y="134" class="s">vertex, nu_score, bcfm_score, total_pe, PFP counts;</text>
   <text x="792" y="150" class="s">longest / second track direction, length, PID, chi2;</text>
   <text x="792" y="166" class="s">two-track block (reco_t, opening angle, momenta, 12 end</text>
@@ -77,7 +78,7 @@
   <text x="792" y="214" class="s">tmatch_idx = generating neutrino, tmatch_eff / purity NaN</text>
 
   <rect x="780" y="236" width="380" height="114" class="box out"/>
-  <text x="792" y="256" class="h">pfp_0: generated   (M4)</text>
+  <text x="792" y="256" class="h">pfp_0: generated   (PFP generator)</text>
   <text x="792" y="276" class="s">fitted PFPs only: trackScore, dist_to_vertex, primary flag,</text>
   <text x="792" y="292" class="s">track start, direction, end, length, range / MCS p_mu,</text>
   <text x="792" y="308" class="s">chi2 mu, p (2 calibrations), K, pi, PIDA (collection plane),</text>
@@ -111,7 +112,7 @@
   <text x="32" y="576" class="s">per-column / per-field marginals (W1), group presence and containment heads, cohpi cut flow (all and true-signal),</text>
   <text x="32" y="592" class="s">correlation matrices and joint densities, per-event real-vs-generated correlations on the same neutrinos,</text>
   <text x="32" y="608" class="s">CC1p0pi acceptance (two signal definitions, jobs 0-199), containment diagnostic, track-end floor, hybrid real-slice test</text>
-  <text x="32" y="630" class="s">not done yet: physics holdouts, uncertainty estimates; joint PFP counts / group presence / longest track in M2 (CC1p0pi purity gap)</text>
+  <text x="32" y="630" class="s">not done yet: physics holdouts, uncertainty estimates; CC1p0pi purity gap in the slice generator (studies: slice_generator_proposal.svg)</text>
 
   <rect x="780" y="536" width="380" height="110" class="box down"/>
   <text x="792" y="556" class="h">Downstream (collaborators)</text>
@@ -125,7 +126,7 @@
   <text x="32" y="684" class="h">Training data and datasets  (truth and reco linked by tmatch_idx)</text>
   <text x="32" y="704" class="s">SBND 2026 gen2 BNB + cosmics CV, v10_14_02_03: official SAM definition, 749,262 flat CAFs, 9.94 M events, processed as 2,000 grid jobs</text>
   <text x="32" y="720" class="s">by a selection-free cafpyana configuration: 17.9 M true neutrinos, 5.74 M truth-matched slices. Split 80 / 10 / 10 by input file (never by row).</text>
-  <text x="32" y="736" class="s">M2 and M4 trained on 3 M sampled training slices each (RTX 3090). Generated for all neutrinos: 5.92 M slices, 14.06 M PFPs.</text>
-  <text x="32" y="756" class="s">Datasets: /pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_official_m3w0_pfp/ (jobs 0-199 so far), surrogate_official_m3_pfp/ (2,000 files, previous M4).</text>
-  <text x="32" y="772" class="s">Status 2026-11-08: M3 v1 inputs; M4 = M3w0 (generated track ends, wall flag, no attention, generator truth only); M2 unchanged since M3.</text>
+  <text x="32" y="736" class="s">Slice and PFP generators trained on 3 M sampled training slices each (RTX 3090). Generated for all neutrinos: 5.92 M slices, 14.06 M PFPs.</text>
+  <text x="32" y="756" class="s">Datasets: /pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_official_m2vw_pfp/ (jobs 0-199 so far), surrogate_official_m3_pfp/ (2,000 files, previous slice and PFP generators).</text>
+  <text x="32" y="772" class="s">Shipped runs: encoder m3 (v1 inputs); slice generator m2_official_m2vw (vertex as the residual to the true vertex, wall flags); PFP generator m4_official_m3w0 (generated track ends, wall flag, no particle attention).</text>
 </svg>

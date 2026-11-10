@@ -1,0 +1,75 @@
+1. link P(n_pfp=3 | exit) - P(n_pfp=3 | contained), truth CC + pion, vertex in FV, nu_score > 0.45
+   real  link +0.025   P(n3|exit) 0.132 (12133)   P(n3|cont) 0.107 (12241)   P(exit) 0.498   P(n3) 0.119
+   gen   link +0.012   P(n3|exit) 0.127 (11497)   P(n3|cont) 0.116 (13199)   P(exit) 0.466   P(n3) 0.121
+
+2. real link inside bins of one truth variable (weighted mean of the within-bin links): the part not explained by it   [real | gen]
+   lead_p_mu      within-bin link real +0.024 | gen +0.011
+   lead_cosz_mu   within-bin link real +0.015 | gen +0.002
+   lead_pt_mu     within-bin link real +0.041 | gen +0.026
+   vtx_z          within-bin link real +0.022 | gen +0.015
+   dist_back      within-bin link real +0.022 | gen +0.015
+   dist_wall_x    within-bin link real +0.021 | gen +0.008
+   dist_wall_y    within-bin link real +0.023 | gen +0.009
+   n_charged      within-bin link real +0.024 | gen +0.011
+   sumke_visible  within-bin link real +0.054 | gen +0.038
+   lead_p_pi      within-bin link real +0.027 | gen +0.013
+   n_p            within-bin link real +0.022 | gen +0.010
+   n_pi           within-bin link real +0.028 | gen +0.014
+   sumke_pi       within-bin link real +0.028 | gen +0.014
+   sum_pz         within-bin link real +0.046 | gen +0.029
+
+3. GBDT P(n_pfp=3 | truth [+ reco exit]) on the selection, half for training; the exit effect = mean P(.., exit=1) - P(.., exit=0)
+   real  logloss truth 0.2992  truth+exit 0.2981   exit effect given truth +0.018   raw link +0.025
+   gen   logloss truth 0.3031  truth+exit 0.3042   exit effect given truth +0.006   raw link +0.012
+
+4. per-event exit decision (selection by the real frame)
+   P(gen exit | real exit) 0.798   P(gen exit | real contained) 0.150   agreement 0.825   P(real exit) 0.486  P(gen exit) 0.464
+   Geant4 leading muon known for 21922 of 21922: P(true exit) 0.415
+   real  P(reco exit | true exit) 0.854   P(reco exit | true contained) 0.224   agreement with Geant4 0.808
+   gen   P(reco exit | true exit) 0.814   P(reco exit | true contained) 0.216   agreement with Geant4 0.797
+   real link split by the Geant4 muon:  true exit  / true contained
+   real  link | true exit -0.001 (n 7772/1330)   link | true contained +0.001 (n 2875/9945)   P(n3 | true exit) 0.101  P(n3 | true cont) 0.091
+   gen   link | true exit -0.010 (n 7412/1690)   link | true contained +0.008 (n 2770/10050)   P(n3 | true exit) 0.101  P(n3 | true cont) 0.092
+   P(exit | lead_p_mu bin) and P(n_pfp=3 | lead_p_mu bin)   [real | gen]
+      p_mu 0.08-0.21  exit 0.217 | 0.204   n3 0.120 | 0.120   n 3654
+      p_mu 0.21-0.32  exit 0.247 | 0.235   n3 0.091 | 0.093   n 3653
+      p_mu 0.32-0.44  exit 0.341 | 0.337   n3 0.092 | 0.096   n 3654
+      p_mu 0.44-0.63  exit 0.492 | 0.476   n3 0.091 | 0.087   n 3653
+      p_mu 0.63-1.00  exit 0.708 | 0.682   n3 0.107 | 0.102   n 3654
+      p_mu 1.00-5.72  exit 0.909 | 0.851   n3 0.072 | 0.077   n 3654
+
+5. link with the exit predicted from truth alone (GBDT on the real exit, half for training), applied to real and generated n_pfp
+   AUC of the truth-predicted exit vs real exit 0.883, vs gen exit 0.864; accuracy at 0.5: real 0.794 gen 0.772
+   real  link with the truth-predicted exit +0.034   with its own reco exit +0.022
+   gen   link with the truth-predicted exit +0.001   with its own reco exit +0.006
+
+6. inside the bins of the truth-predicted exit probability: P(n_pfp=3 | bin, reco exit / contained) and by the Geant4 muon   [real | gen]
+   P(exit) 0.01-0.13  real 0.116/0.106 (link +0.010) | gen 0.148/0.100 (link +0.048) | Geant4 exit/cont real 0.062/0.105 gen 0.062/0.103
+   P(exit) 0.13-0.35  real 0.116/0.093 (link +0.023) | gen 0.113/0.093 (link +0.020) | Geant4 exit/cont real 0.121/0.087 gen 0.111/0.096
+   P(exit) 0.35-0.61  real 0.158/0.120 (link +0.038) | gen 0.111/0.095 (link +0.016) | Geant4 exit/cont real 0.136/0.084 gen 0.122/0.089
+   P(exit) 0.61-0.91  real 0.158/0.153 (link +0.005) | gen 0.095/0.090 (link +0.005) | Geant4 exit/cont real 0.090/0.080 gen 0.099/0.086
+   P(exit) 0.91-0.99  real 0.103/0.126 (link -0.023) | gen 0.097/0.085 (link +0.012) | Geant4 exit/cont real 0.096/0.080 gen 0.097/0.060
+   check: P(n_pfp=3) real over the half-sample selection, with the gen selection too, with the Geant4 muon known: 0.121  0.097  0.097 | rows 12187 10982 10982 | P(n3) of gen-selected-only rows 0.342
+
+7. the link with weaker selections (each sample its own population): is the deficit in the counts or in the nu_score / vertex selection?
+   CC + pion, longest track present   real n 46435 P(n3) 0.178 P(exit) 0.517 link +0.011 [P(n3|exit) 0.183 P(n3|cont) 0.172] | gen n 46497 P(n3) 0.178 P(exit) 0.486 link +0.016 [P(n3|exit) 0.186 P(n3|cont) 0.170]
+   + vertex in FV                     real n 25704 P(n3) 0.130 P(exit) 0.494 link +0.025 [P(n3|exit) 0.143 P(n3|cont) 0.118] | gen n 25949 P(n3) 0.131 P(exit) 0.460 link +0.009 [P(n3|exit) 0.136 P(n3|cont) 0.127]
+   + nu_score > 0.45                  real n 24374 P(n3) 0.119 P(exit) 0.498 link +0.025 [P(n3|exit) 0.132 P(n3|cont) 0.107] | gen n 24696 P(n3) 0.121 P(exit) 0.466 link +0.012 [P(n3|exit) 0.127 P(n3|cont) 0.116]
+   + nu_score > 0.45, n_pfp <= 4      real n 9610 P(n3) 0.302 P(exit) 0.511 link +0.047 [P(n3|exit) 0.325 P(n3|cont) 0.278] | gen n 9920 P(n3) 0.301 P(exit) 0.467 link +0.028 [P(n3|exit) 0.316 P(n3|cont) 0.288]
+   P(nu_score > 0.45 | n_pfp=3, exit / contained) and P(vertex in FV | n_pfp=3, exit / contained), CC + pion with a longest track   [real | gen]
+   real  nu_score pass | exit 0.802  cont 0.862    FV | exit 0.413  cont 0.397    n3 events 8243
+   gen   nu_score pass | exit 0.817  cont 0.865    FV | exit 0.385  cont 0.438    n3 events 8276
+
+8. the reco vertex of n_pfp=3 CC + pion slices whose TRUE vertex is in the FV, by reco exit: pass rates of each FV boundary and the reco-true vertex displacement   [real | gen]
+   real  exit  n  1012  reco FV 0.975  |x|<190 0.998  |y|<190 0.988  z>10 0.994  z<450 0.993  | displacement median 0.4 cm  P(>5 cm) 0.159  P(>20 cm) 0.079  P(>50 cm) 0.037
+   real  cont  n  1187  reco FV 0.958  |x|<190 0.994  |y|<190 0.982  z>10 0.988  z<450 0.993  | displacement median 0.6 cm  P(>5 cm) 0.338  P(>20 cm) 0.203  P(>50 cm) 0.107
+   gen   exit  n  1019  reco FV 0.950  |x|<190 0.988  |y|<190 0.981  z>10 0.992  z<450 0.988  | displacement median 0.4 cm  P(>5 cm) 0.175  P(>20 cm) 0.083  P(>50 cm) 0.042
+   gen   cont  n  1202  reco FV 0.967  |x|<190 0.997  |y|<190 0.989  z>10 0.986  z<450 0.994  | displacement median 0.6 cm  P(>5 cm) 0.307  P(>20 cm) 0.181  P(>50 cm) 0.082
+   same for ALL CC + pion slices with a longest track and the true vertex in the FV (not only n_pfp=3)
+   real  exit  n 10958  reco FV 0.989  | displacement P(>5 cm) 0.078  P(>20 cm) 0.035  P(>50 cm) 0.016   P(n3) 0.092
+   real  cont  n 12015  reco FV 0.985  | displacement P(>5 cm) 0.131  P(>20 cm) 0.075  P(>50 cm) 0.039   P(n3) 0.099
+   gen   exit  n 10568  reco FV 0.983  | displacement P(>5 cm) 0.076  P(>20 cm) 0.036  P(>50 cm) 0.018   P(n3) 0.096
+   gen   cont  n 12421  reco FV 0.989  | displacement P(>5 cm) 0.121  P(>20 cm) 0.069  P(>50 cm) 0.033   P(n3) 0.097
+   P(n_pfp=3 | displacement > 20 cm / <= 20 cm), CC + pion, true vertex in FV, longest track present   [real | gen]
+   real  P(n3 | far) 0.248 (n 1293)  P(n3 | near) 0.087   P(exit | far) 0.301  P(exit | near) 0.487
+   gen   P(n3 | far) 0.242 (n 1246)  P(n3 | near) 0.088   P(exit | far) 0.307  P(exit | near) 0.468

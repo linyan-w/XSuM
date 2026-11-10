@@ -6,7 +6,7 @@ PROD=/pnfs/sbnd/persistent/users/lwan/dataframe/prod_v10_14_02_03_official
 STAGE=$S/$NAME; DST=/pnfs/sbnd/persistent/users/lwan/dataframe/$NAME
 log() { echo "$(date +%H:%M:%S) $*"; }
 cd $S/XSuM; mkdir -p $STAGE $DST $S/diag_m3w0
-log "pass 1"; python scripts/write_surrogate_df.py $GEN $PROD $STAGE --workers 8 --pfp $PFP --chunks $(seq 0 199) 2>&1 | grep -v Warning | tail -1
+log "pass 1"; python scripts/write_surrogate_df.py $GEN $PROD $STAGE --workers 8 --pfp $PFP --chunks $(seq 0 199) --split-table /pnfs/sbnd/persistent/users/lwan/dataframe/file_splits.parquet 2>&1 | grep -v Warning | tail -1
 cp $STAGE/file_splits.parquet $DST/; for n in $(seq 0 199); do cp $STAGE/xsum_surrogate_$n.df $DST/; done; chmod a+rx $DST; chmod a+r $DST/*
 log "PASS1 DONE"
 cd $S

@@ -1,0 +1,66 @@
+
+1mu1p0pi: cells (slice n_trk, PFP 2prong) -> n, longest-track end in FV   [real | surrogate]
+   n_trk   1 2prong True  |  1609  0.353 |  1599  0.348
+   n_trk   1 2prong False |  1002  0.403 |  1128  0.427
+   n_trk   2 2prong True  |  5552  0.403 |  5526  0.397
+   n_trk   2 2prong False |  1455  0.452 |  1380  0.469
+   n_trk >=3 2prong True  |     0    nan |     2  0.000
+   n_trk >=3 2prong False |    81  0.333 |    98  0.469
+   r: P(slice n_trk=2 | 2prong) 0.771   P(2prong | slice n_trk=2) 0.792   n_good vs n_trk equal 0.638
+   s: P(slice n_trk=2 | 2prong) 0.772   P(2prong | slice n_trk=2) 0.800   n_good vs n_trk equal 0.647
+
+CC Npi: cells (slice n_trk, PFP 2prong) -> n, longest-track end in FV   [real | surrogate]
+   n_trk   1 2prong True  |   329  0.441 |   362  0.511
+   n_trk   1 2prong False |   600  0.513 |   768  0.531
+   n_trk   2 2prong True  |   379  0.412 |   411  0.479
+   n_trk   2 2prong False |  1671  0.540 |  1599  0.508
+   n_trk >=3 2prong True  |     0    nan |     5  0.400
+   n_trk >=3 2prong False |  1908  0.506 |  1637  0.498
+   r: P(slice n_trk=2 | 2prong) 0.499   P(2prong | slice n_trk=2) 0.185   n_good vs n_trk equal 0.189
+   s: P(slice n_trk=2 | 2prong) 0.500   P(2prong | slice n_trk=2) 0.204   n_good vs n_trk equal 0.208
+
+NC: cells (slice n_trk, PFP 2prong) -> n, longest-track end in FV   [real | surrogate]
+   n_trk   1 2prong True  |   537  0.825 |   550  0.800
+   n_trk   1 2prong False |  1951  0.846 |  1849  0.849
+   n_trk   2 2prong True  |   445  0.820 |   457  0.816
+   n_trk   2 2prong False |   604  0.805 |   594  0.790
+   n_trk >=3 2prong True  |     0    nan |    10  0.700
+   n_trk >=3 2prong False |   303  0.789 |   376  0.763
+   r: P(slice n_trk=2 | 2prong) 0.335   P(2prong | slice n_trk=2) 0.424   n_good vs n_trk equal 0.386
+   s: P(slice n_trk=2 | 2prong) 0.333   P(2prong | slice n_trk=2) 0.435   n_good vs n_trk equal 0.386
+
+CC other 0pi: cells (slice n_trk, PFP 2prong) -> n, longest-track end in FV   [real | surrogate]
+   n_trk   1 2prong True  |  1378  0.440 |  1347  0.450
+   n_trk   1 2prong False |  4030  0.448 |  4039  0.453
+   n_trk   2 2prong True  |   807  0.605 |   752  0.605
+   n_trk   2 2prong False |  2112  0.534 |  2169  0.504
+   n_trk >=3 2prong True  |     0    nan |     8  0.250
+   n_trk >=3 2prong False |  2018  0.528 |  1944  0.524
+   r: P(slice n_trk=2 | 2prong) 0.354   P(2prong | slice n_trk=2) 0.276   n_good vs n_trk equal 0.448
+   s: P(slice n_trk=2 | 2prong) 0.340   P(2prong | slice n_trk=2) 0.257   n_good vs n_trk equal 0.448
+
+by slice n_pfp (2prong is ~ n_pfp = 3): n, longest-track end in FV, P(2prong)   [real | surrogate]
+  1mu1p0pi
+    n_pfp   2 |   509  0.371  0.000 |   599  0.392  0.000
+    n_pfp   3 |  5998  0.359  0.971 |  5943  0.363  0.971
+    n_pfp   4 |  2504  0.477  0.470 |  2535  0.475  0.478
+    n_pfp   5 |   638  0.528  0.270 |   596  0.507  0.253
+    n_pfp >=6 |   158  0.487  0.165 |   147  0.558  0.129
+  CC Npi
+    n_pfp   2 |   156  0.513  0.000 |   196  0.536  0.000
+    n_pfp   3 |   610  0.439  0.926 |   658  0.476  0.897
+    n_pfp   4 |  1185  0.499  0.129 |  1221  0.507  0.135
+    n_pfp   5 |  1359  0.554  0.024 |  1427  0.515  0.039
+    n_pfp >=6 |  1739  0.518  0.005 |  1563  0.521  0.007
+  NC
+    n_pfp   2 |  1343  0.859  0.000 |  1303  0.866  0.000
+    n_pfp   3 |  1266  0.817  0.896 |  1269  0.805  0.901
+    n_pfp   4 |  1053  0.810  0.153 |  1085  0.794  0.180
+    n_pfp   5 |   558  0.774  0.045 |   519  0.773  0.031
+    n_pfp >=6 |   506  0.749  0.014 |   532  0.763  0.032
+  CC other 0pi
+    n_pfp   2 |  2518  0.397  0.000 |  2522  0.408  0.000
+    n_pfp   3 |  2367  0.522  0.783 |  2316  0.517  0.758
+    n_pfp   4 |  2423  0.500  0.152 |  2485  0.504  0.149
+    n_pfp   5 |  1794  0.549  0.027 |  1843  0.527  0.035
+    n_pfp >=6 |  1589  0.559  0.005 |  1523  0.554  0.012

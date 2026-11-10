@@ -1,0 +1,78 @@
+background neutrinos at 2prong: real 10089 (contained 1992), XSuM 10164 (contained 2349); excess contained 357
+
+is_muon_contained:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+                  0.0 |     971   0.013 |     873   0.044
+                  1.0 |     479   0.438 |     441   0.481
+                  nan |    8639   0.205 |    8850   0.237
+   excess explained by the bin populations: +25
+
+is_cpi_contained:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+                  0.0 |     328   0.015 |     258   0.078
+                  1.0 |    1122   0.194 |    1056   0.218
+                  nan |    8639   0.205 |    8850   0.237
+   excess explained by the bin populations: +29
+
+muon_end_fv:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+                  0.0 |     938   0.000 |     858   0.044
+                  1.0 |     512   0.436 |     456   0.465
+                  nan |    8639   0.205 |    8850   0.237
+   excess explained by the bin populations: +19
+
+cpi_end_fv:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+                  0.0 |     305   0.000 |     316   0.082
+                  1.0 |    1145   0.195 |     998   0.224
+                  nan |    8639   0.205 |    8850   0.237
+   excess explained by the bin populations: +15
+
+topo:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+              2/2/1/0 |    4088   0.106 |    4068   0.131
+              1/1/0/0 |    1869   0.174 |    1892   0.219
+              2/2/0/0 |    1708   0.144 |    1683   0.166
+              2/1/0/1 |     619   0.252 |     648   0.301
+              1/1/0/1 |     511   0.284 |     521   0.311
+              1/1/1/0 |     235   0.600 |     269   0.625
+              1/0/0/2 |     248   0.540 |     232   0.569
+              2/2/2/0 |     237   0.494 |     215   0.479
+   excess explained by the bin populations: +9
+
+long_trk_len:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+              (0, 25] |     620   0.632 |     662   0.648
+           (100, 150] |    1850   0.128 |    1925   0.174
+           (150, 200] |    1394   0.108 |    1343   0.121
+           (200, 300] |    1605   0.082 |    1632   0.103
+             (25, 50] |    1265   0.426 |    1245   0.497
+          (300, 1000] |     915   0.064 |     951   0.076
+            (50, 100] |    2433   0.199 |    2397   0.234
+                  nan |       7   0.286 |       9   0.333
+   excess explained by the bin populations: +20
+
+long_dirz:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+          (-0.5, 0.0] |     623   0.332 |     573   0.419
+         (-1.0, -0.5] |     950   0.275 |     879   0.339
+           (0.0, 0.5] |    1598   0.258 |    1586   0.284
+           (0.5, 0.8] |    2584   0.181 |    2706   0.208
+          (0.8, 0.95] |    3044   0.143 |    3062   0.179
+          (0.95, 1.0] |    1288   0.161 |    1358   0.184
+                  nan |       2   0.000 |       0     nan
+   excess explained by the bin populations: -3
+
+vtx_z:   bin  |  real n  P(cont)  |  XSuM n  P(cont)
+              (0, 50] |    1087   0.170 |    1095   0.226
+           (100, 200] |    2203   0.241 |    2192   0.279
+           (200, 300] |    2236   0.222 |    2225   0.251
+           (300, 400] |    2229   0.170 |    2243   0.212
+           (400, 450] |    1155   0.091 |    1219   0.112
+            (50, 100] |    1179   0.249 |    1190   0.268
+   excess explained by the bin populations: +7
+
+  NC                           real 2prong  1327 cont   853 | XSuM  1381 cont   921
+  nue CC                       real 2prong    61 cont    27 | XSuM    84 cont    39
+  numu CC 1p0pi (any cont.)    real 2prong  5664 cont    90 | XSuM  5716 cont   287
+  numu CC Npi                  real 2prong   759 cont   207 | XSuM   797 cont   267
+  numu CC other 0pi            real 2prong  2278 cont   815 | XSuM  2186 cont   835
+
+wall consistency of the slice block (all matched slices of jobs 0-199)
+  real long_trk_len / path to wall: 0-0.5:0.398 0.5-0.8:0.172 0.8-0.9:0.067 0.9-0.95:0.052 0.95-0.98:0.055 0.98-1.02:0.145 1.02-1.05:0.034 1.05-1.2:0.044 1.2-10:0.032
+       cohpi muon end to wall: <-3 0.001  +-3 0.429  3-10 0.063  10-20 0.043  >20 0.464
+  M2   long_trk_len / path to wall: 0-0.5:0.404 0.5-0.8:0.173 0.8-0.9:0.058 0.9-0.95:0.030 0.95-0.98:0.040 0.98-1.02:0.165 1.02-1.05:0.029 1.05-1.2:0.037 1.2-10:0.050
+       cohpi muon end to wall: <-3 0.045  +-3 0.427  3-10 0.051  10-20 0.035  >20 0.441

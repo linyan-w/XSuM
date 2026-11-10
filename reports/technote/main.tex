@@ -90,7 +90,17 @@ efficiency and records the count.
 
 \paragraph{Splits.} Train / validation / test are 80 / 10 / 10 by input file, never by row. In the five
 scratch chunks: \nTrain{} / \nTest{} neutrinos in train / test. Holdout tests use physics regions
-(momentum transfer, energy, angle, multiplicity, TPC), see Sec.~\ref{sec:outlook}.
+(momentum transfer, energy, angle, multiplicity, TPC), see Sec.~\ref{sec:outlook}. The assignment is a seeded
+shuffle of the sorted file list and therefore depends on the whole list; found on 2026-11-09: the encoder, the slice
+flow and the PFP generator are trained on the matched table and share one split, but the datasets'
+\texttt{file\_splits.parquet} had been derived from the generated index (13 files fewer) and the cardinality head
+uses the card table, so the datasets' ``test'' files overlapped the models' test files at 10--20\% only and 71\% of
+them were training files of the generators. All acceptance numbers of Sec.~\ref{sec:ends} up to that date are on
+that mostly in-sample selection (the variant comparisons share it; the absolute closure does not). Since then the
+split table is derived once from the generators' training table (\texttt{xsum.data.splits.file\_split\_table},
+\texttt{scripts/make\_file\_splits.py}; files without a matched slice are test) and copied into every dataset and
+the test-file loader; the held-out numbers are given where they were remeasured. The cardinality head still saw
+90\% of the held-out files; the next training round splits by a hash of the file id.
 
 \section{Inputs and targets}
 \label{sec:io}
@@ -168,7 +178,14 @@ track pairs). (iii) A conditional flow-matching model (linear path, Gaussian sou
 width 1024) over the standardised continuous block, masked per event to the groups and dimensions that exist
 (sim2reco \texttt{dim\_mask}). Positive quantities enter as logarithms, direction cosines and the opening
 angle through $\operatorname{artanh}$ (and direction vectors are renormalised), standardisation is robust
-(median, MAD). Inverse transforms produce a dataframe with the production column names. Trained on
+(median, MAD). Inverse transforms produce a dataframe with the production column names. Two choices were added
+on 2026-11-09 after the studies of Sec.~\ref{sec:ends} and are part of the shipped configuration (run
+\texttt{m2\_official\_m2vw}, \texttt{--vtx-resid --walls}): the three reco-vertex coordinates enter the flow as the
+residual to the true vertex, $\operatorname{asinh}(\Delta/1\,\mathrm{cm})$, and are added back to the true vertex at
+generation (the absolute coordinates had a 4--6\,cm resolution core against 0.5\,cm \real{}); and the longest-track
+length and the cohpi muon and pion end points carry wall targets (a flag for ``at the wall'' and an offset within
+the wall band; flagged values are snapped onto the wall at generation, the offset clipped to the band, and an
+unflagged end point beyond the band is mirrored back inside). Trained on
 \mTwoMatched{} matched slices of the official sample for \mTwoEpochs{} epochs (54\,min on one RTX~3090). Host
 memory is kept near 10\,GB by splitting the table once on disk into a matched-only table and a 4\,M-row
 subsample for the cardinality head, training the presence heads on 2\,M-row subsamples and building the topology
@@ -177,7 +194,8 @@ one-hot per batch on the GPU.
 Earlier versions and what they taught: v1 (unbounded cosines, counts as dequantised flow dimensions) closed
 the cohpi cut flow only to 45\% in the signal region; v2 (bounded cosines, point-mass heads) to 74\%, losing
 most at the exact-count stage; v3 (topology head) closes every stage within statistics on the scratch sample and to better than 10\% at every
-stage on the official sample (Table~\ref{tab:m2cut}).
+stage on the official sample (Table~\ref{tab:m2cut}); the particle-set inputs of Sec.~\ref{sec:m3} (run
+\texttt{m2\_official\_m3}, shipped 2026-11-05 to 2026-11-09) and the vertex-residual and wall targets above complete it.
 
 \begin{table}[h]\centering\input{m2_presence.tex}\caption{Group presence and containment heads, test files.}\label{tab:m2pres}\end{table}
 
@@ -404,7 +422,11 @@ M3 & 3,852 & 0.199 / 0.397 & 0.543 / 0.339 & 0.106 / 0.861 \\
 M3w (Geant4 inputs, diagnostic) & 3,698 & 0.190 / 0.395 & 0.569 / 0.370 & 0.104 / 0.876 \\
 M3w0 (shipped) & 3,725 & 0.191 / 0.394 & 0.531 / 0.343 & 0.106 / 0.872 \\
 hybrid: \real{} slices $+$ M3w0 PFPs & 3,500 & 0.194 / 0.426 & 0.559 / 0.384 & 0.112 / 0.880 \\
-M2w: M2 with wall targets $+$ M3w0 & 3,639 & 0.185 / 0.390 & 0.515 / 0.341 & 0.106 / 0.870 \\\bottomrule
+M2w: M2 with wall targets $+$ M3w0 & 3,639 & 0.185 / 0.390 & 0.515 / 0.341 & 0.106 / 0.870 \\\midrule
+\multicolumn{5}{l}{\emph{held-out split (Sec.~\ref{sec:data}), the same jobs:}} \\
+\real{} & 3,555 & 0.197 / 0.425 & 0.623 / 0.418 & 0.109 / 0.885 \\
+M3w0, previous slice generator & 3,720 & 0.193 / 0.398 & 0.537 / 0.344 & 0.108 / 0.875 \\
+M2vw $+$ M3w0 (shipped, 2026-11-09) & 3,654 & 0.192 / 0.403 & 0.538 / 0.351 & 0.113 / 0.869 \\\bottomrule
 \end{tabular}
 \caption{CC1p0pi at ``2prong-contained'' (selected, efficiency and purity under both signal definitions) and at
 the end of the selection (2prong-mup-PID), test files of jobs 0--199.}\label{tab:ends_accept}\end{table}
@@ -455,15 +477,98 @@ end in FV / outside) 0.107 / 0.135 against \real{} 0.108 / 0.135) and loses it o
 reduces the link most for the short-track group (from +0.028 to +0.016, mostly through whether a short track exists),
 less for the two-track group, the direction and the length; no single group restores it. The link is carried
 jointly by the longest track, the presence of the optional groups and the PFP counts, which M2 samples in separate
-pieces. Neither study is shipped; the shipped M2 is unchanged.
+pieces.
+
+\paragraph{M2s: two-stage M2.} Stage 1 is one flow over the always-present variables, the five PFP counts
+(dequantised integers) and the group-presence flags; stage 2 is a flow over the optional groups, conditioned on the
+truth and the stage-1 output and masked by the generated presence. The hard relations of the \real{} reconstruction
+(counts nested, a short track whenever $n_\mathrm{trk}\ge2$, the two-track block only for $n_\mathrm{prong}=n_\mathrm{trk}=2$)
+are enforced after stage 1; they correct 0.03--0.9\% of the slices. The targeted link closes: CC N$\pi$ at
+$n_\mathrm{pfp}=3$, longest track ending in the FV 0.442 against \real{} 0.439, and the pion range momentum lies on the
+length curve for 93\% of the slices (\real{} 93\%). The chain loses 2prong events, however: efficiency 0.165 and
+purity 0.396 at 2prong-contained (\real{} 0.198 / 0.435), P(PFP 2prong | slice $n_\mathrm{pfp}=3$) 0.85 against
+0.97 for signal. The dequantised counts do not keep the joint count lattice: 17\% of the generated slices carry a
+($n_\mathrm{pfp}, n_\mathrm{prong}, n_\mathrm{trk}, n_\mathrm{proton}, n_\mathrm{shower}$) tuple that \real{} slices
+do not populate, and the (3, 2, 2, $\cdot$, 0) tuples are 0.341 of $n_\mathrm{pfp}=3$ against 0.439, so M4 builds
+fewer two-track sets. In the variant M2o the counts enter stage 1 as the topology class (a dequantised one-hot
+over the 121 classes, decoded by argmax; \texttt{--topo-onehot}). Every generated tuple is then a \real{} one,
+(3, 2, 2, $\cdot$, 0) is 0.435 of $n_\mathrm{pfp}=3$ and P(PFP 2prong | $n_\mathrm{pfp}=3$) 0.966 for signal, but
+the argmax overweights the high-multiplicity classes ($n_\mathrm{pfp}\ge6$ 0.115 against 0.084), the longest-track
+length is generated less well, and the link is lost again (0.515); purity 0.371, efficiency 0.170. None of these
+studies is shipped; the shipped M2 is unchanged. In the third variant, M2c (Fig.~\ref{fig:slicegen}, row 4),
+stage 1 carries no counts and the topology class comes from a classifier on the truth and the generated stage-1
+values including the presence flags, restricted to the classes compatible with the sampled presence. The counts are
+then as good as the shipped generator's (tuple distance 0.017 against 0.015; P(2prong | $n_\mathrm{pfp}=3$) 0.970
+against 0.971) and the acceptance equals the shipped chain (0.191 / 0.396 against 0.191 / 0.394), but the link is not
+reproduced (0.488). At the M2 level none of the variants reproduces it (longest track ending in the FV for truth CC +
+pion slices with $n_\mathrm{pfp}=3$: 0.480--0.521 against \real{} 0.446); M2s's chain value 0.442 came from its
+distorted $n_\mathrm{pfp}=3$ population, not from the correlation.
+
+\paragraph{Where the link comes from.} On the M2 test slices (\texttt{scripts/diag\_m2\_link.py}) the exit $\leftrightarrow$
+$n_\mathrm{pfp}=3$ link of truth CC + pion events is absent without a vertex cut (\real{} $+0.005$) and appears with
+the cut on the \emph{reconstructed} vertex ($+0.026$; the generated slices give $+0.010$ to $+0.017$ either way).
+Among $n_\mathrm{pfp}=3$ slices whose true vertex is in the FV, the reco vertex passes the FV for 0.975 (exiting
+muon) and 0.958 (contained) of the \real{} slices, 0.932 and 0.968 of the generated ones. The cause is the vertex
+resolution: the reco--true displacement has a median of 0.4--0.6\,cm in \real{} (P($>5$\,cm) 0.08 / 0.13) and
+4--6\,cm in the generated slices (0.30 / 0.36), with matching tails. Exiting-muon events have true vertices nearer
+the downstream and side walls, so the 4\,cm smear pushes them out of the FV. The vertex is generated as an absolute
+position under a robust linear scaling, which hides a 0.5\,cm core next to the 10\,cm-scale misplacements. A bigger
+topology head or muon--hadron angles as extra inputs do not change the link (\texttt{scripts/retrain\_topo\_head.py},
+\texttt{diag\_m2\_link\_angles.py}).
+
+\paragraph{Vertex as a residual (M2v).} The shipped configuration retrained with the three vertex columns entering
+the flow as $\sinh^{-1}((\mathrm{reco}-\mathrm{true})/1\,\mathrm{cm})$, added back to the true vertex and clipped
+to the real range at generation (\texttt{--vtx-resid}). The vertex core is fixed: displacement median 0.4 / 0.6\,cm,
+P($>5$\,cm) 0.175 / 0.307 (\real{} 0.159 / 0.338), tails unchanged; the reco FV pass of $n_\mathrm{pfp}=3$ slices
+with the true vertex in the FV is 0.950 (exit) / 0.967 (contained) against \real{} 0.975 / 0.958 (shipped 0.932 /
+0.968). The acceptance is the shipped chain (0.193 / 0.397) and the CC N$\pi$ exit fraction at $n_\mathrm{pfp}=3$
+is 0.502. The remaining link sits in the \emph{dirt} slices (true vertex outside the active volume, three fifths of
+the CC + pion $n_\mathrm{pfp}=3$ slices after the reco-vertex and nu\_score cuts): in \real{} a dirt slice whose
+longest track exits has its reco vertex inside the FV 0.32 of the time and 0.12 when the track is contained; the
+generators give 0.25--0.28 / 0.18--0.20 (\texttt{scripts/diag\_m2\_vtx\_dir.py}). The reco vertex position itself
+(on the muon line at the entry wall for 0.31, off the line for 0.67, position along the chord) is reproduced; what is
+missing is the longest track given the vertex: P(exit | reco vertex in FV) 0.750 \real{}, 0.552 M2v, and \real{}
+exiting tracks have a length equal to the path to the wall within 5\% for 0.51 against 0.23 (M2v), 0.26 (shipped),
+0.51 (M2w, the wall-target variant, \texttt{diag\_m2\_vtx\_dirt.py}). The dirt link is the wall relation of the
+longest track; M2w restores it but kept the 4--6\,cm vertex core.
+
+\paragraph{Both fixes (M2vw).} The shipped configuration with \texttt{--vtx-resid --walls}. Both zones move towards
+\real{}: FV pass by exit 0.960 / 0.969 for true vertices in the FV (\real{} 0.975 / 0.958); dirt P(exit | reco vertex
+in FV) 0.627 (\real{} 0.750, M2v 0.552, M2w 0.686). The M2-level link is $+0.011$ (\real{} $+0.025$), the chain CC
+N$\pi$ exit fraction at $n_\mathrm{pfp}=3$ 0.476 (\real{} 0.439, shipped 0.49), and the acceptance 0.188 / 0.400
+against the shipped 0.191 / 0.394: a gain within the statistical precision of the test sample ($\pm 0.008$). The
+primary purity gap decomposes into background $+194$ (the slice generator: the hybrid with \real{} slices has $+31$)
+and primary signal $-77$ (the PFP generator: truth-contained signal $-253$, truth-uncontained signal reconstructed as
+contained $+176$). The latter is a correlation loss in the PFP end points: for CC 1p0$\pi$ neutrinos whose muon
+leaves the FV, each containment condition passes at the \real{} rate but, given both track ends inside the FV, the
+vertex and ends are on one side of the cathode 0.064 of the time in \real{} and 0.220 generated (the \real{} muon has
+crossed the cathode). It sets the truth-contained (notebook) purity, 0.431 against 0.35, and is the largest lever
+left in M4.
+
+\paragraph{M2vw adopted (2026-11-09).} M2vw is the shipped slice generator: the vertex resolution is right where the
+previous run was ten times too wide, the wall marginals of the slice block match \real{} (Table~\ref{tab:m2wall}),
+and every stage of the acceptance is at least as close to \real{} as before, at a cost of a per-column
+Wasserstein distance of 0.0091 against 0.0073 of the range. Before adoption the snapping was completed: a flagged
+end point's offset is clipped to the wall band (3--7\% of flagged ends fell outside it) and an unflagged end point
+beyond the band (2\% per axis, up to tens of cm, none in \real{}) is mirrored back inside about the wall plane
+(\texttt{apply\_walls}, \texttt{tests/test\_walls.py}); the cohpi muon end outside the TPC falls from 0.069 to
+0.000. The acceptance does not use these columns. Remeasured on the held-out split (Sec.~\ref{sec:data},
+Table~\ref{tab:ends_accept}): \real{} 0.197 / 0.425, the previous chain 0.193 / 0.398, M2vw 0.192 / 0.403, i.e.
+the gap is $-0.022$ against $-0.027$, the background excess $+137$ against $+196$ events, and M2vw is nearer \real{}
+at every stage (selected / \real{} at the vertex cut 1.006 against 1.012, at 2prong-contained 1.028 against 1.046).
+The held-out closure equals the in-sample one within statistics: the generators do not overfit their training files.
+
+\begin{figure}[h]\centering\includegraphics[width=\textwidth]{slice_generator_proposal.pdf}
+\caption{The slice generator (M2): the previous shipped scheme, the three two-stage variants, the vertex-residual variant and the combined variant, adopted. Numbers from the
+CC1p0pi acceptance on test jobs 0--199.}\label{fig:slicegen}\end{figure}
 
 \begin{table}[h]\centering\small
-\begin{tabular}{lccc}\toprule
-all matched slices, jobs 0--199 & \real{} & M2 & M2w \\\midrule
-longest track: length / path to the wall within $\pm2\%$ & 0.145 & 0.060 & 0.163 \\
-\quad length / path $>1.05$ & 0.076 & 0.133 & 0.091 \\
-cohpi muon end on the wall ($\pm3$\,cm) & 0.429 & 0.079 & 0.434 \\
-cohpi muon end outside the TPC ($<-3$\,cm) & 0.001 & 0.187 & 0.043 \\\bottomrule
+\begin{tabular}{lcccc}\toprule
+all matched slices, jobs 0--199 & \real{} & M2 (previous) & M2w & M2vw (shipped) \\\midrule
+longest track: length / path to the wall within $\pm2\%$ & 0.145 & 0.060 & 0.163 & 0.161 \\
+\quad length / path $>1.05$ & 0.076 & 0.133 & 0.091 & 0.092 \\
+cohpi muon end on the wall ($\pm3$\,cm) & 0.429 & 0.079 & 0.434 & 0.433 \\
+cohpi muon end outside the TPC ($<-3$\,cm) & 0.001 & 0.187 & 0.043 & 0.000 \\\bottomrule
 \end{tabular}
 \caption{Wall consistency of the slice block (\texttt{scripts/diag\_m2\_purity.py}).}\label{tab:m2wall}\end{table}
 \FloatBarrier
@@ -493,13 +598,13 @@ The second dataset, \texttt{surrogate\_official\_v3} (2026-10-22), applies the o
 Sec.~\ref{sec:m2} to all 17,861,754 neutrinos of the official production: 5.9\,M generated slices in 27\,min,
 6,302 of which pass the full cohpi selection against 6,095 in the real chain (2,988 in the signal region). It is
 written as 2,000 files \texttt{xsum\_surrogate\_N.df} (75\,GB) in
-\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_v3/}, one per grid job of the archive
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_v3/} (deleted 2026-11-09, superseded), one per grid job of the archive
 \texttt{prod\_v10\_14\_02\_03\_official/}, with \texttt{mcnu, mcprim, mcdaught, pfp, hdr} and the POT tables
 copied from the production and \texttt{slc\_0} generated (same conventions as above); \texttt{file\_splits.parquet}
 marks the 74,533 test files. Note that the real \texttt{slc} tables of that archive must be read from the repaired
 sidecars \texttt{prod\_v10\_14\_02\_03\_official\_slcfix/} (Sec.~\ref{sec:data}).
 
-\texttt{surrogate\_official\_v3\_pfp} (2026-10-22) is the same dataset with a generated \texttt{pfp\_0} table from
+\texttt{surrogate\_official\_v3\_pfp} (2026-10-22; deleted 2026-11-09, superseded) is the same dataset with a generated \texttt{pfp\_0} table from
 the M4 v2 set model of Sec.~\ref{sec:m4}: 14,005,625 PFPs for the 5,926,843 generated slices (69\,min of
 generation), with the 26 generated fields laid out under the production column names, straight-line track end
 points, no PFPs without a fit, and no induction-plane chi2 or truth-match columns. This is the first dataset in
@@ -507,37 +612,55 @@ which every reconstructed object of the slice is surrogated.
 
 \texttt{surrogate\_official\_m3\_pfp} (2026-11-05) is the same construction with the M2 and M4 models retrained on
 the particle-set inputs of Sec.~\ref{sec:m3}: 5,923,999 generated slices and 14,061,560 PFPs, 2,000 files in
-\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m3\_pfp/}. It supersedes
-\texttt{surrogate\_official\_v3\_pfp} for any selection that uses track directions or containment.
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m3\_pfp/}. It superseded
+\texttt{surrogate\_official\_v3\_pfp} for any selection that uses track directions or containment, and remains the
+only complete (2,000-job) dataset until \texttt{surrogate\_official\_m2vw\_pfp} is written in full.
 
-\texttt{surrogate\_official\_m3w0\_pfp} (2026-11-08) replaces the PFP table with the shipped M4 (M3w0,
-Sec.~\ref{sec:ends}): generated track end points with the wall pile-up, generator truth only; same M2 slices
-(5,923,999) and 14,061,560 PFPs (94\,min of generation). Written so far for the test files of jobs 0--199 in
-\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m3w0\_pfp/}; the other 1,800 jobs follow
-after review.
+\texttt{surrogate\_official\_m3w0\_pfp} (2026-11-08) replaced the PFP table with the shipped M4 (M3w0,
+Sec.~\ref{sec:ends}): generated track end points with the wall pile-up, generator truth only; the same M2 slices
+(5,923,999) and 14,061,560 PFPs (94\,min of generation), written for the test files of jobs 0--199 only. It is
+superseded by the current dataset and removed.
+
+\texttt{surrogate\_official\_m2vw\_pfp} (2026-11-09) is the shipped chain: slices from the adopted M2 (M2vw,
+Sec.~\ref{sec:m2}: vertex as the residual to the true vertex, wall targets) and PFPs from the shipped M4 (M3w0).
+Written so far for the test files of jobs 0--199 (6\,GB) in
+\texttt{/pnfs/sbnd/persistent/users/lwan/dataframe/surrogate\_official\_m2vw\_pfp/}; the other 1,800 jobs follow
+after review. The test-file loader \texttt{dataframe/xsum\_testsplit.py} reads the (dataset-independent) split from
+\texttt{dataframe/file\_splits.parquet} and defaults to this dataset.
 
 \section{Outlook}
 \label{sec:outlook}
 
-Done so far: the official sample, M1 baselines, M2 (slice block), M3 (particle-set encoder, stage A), M4 (PFP set, generated track ends on the wall),
+Done so far: the official sample, M1 baselines, M2 (slice block; vertex residual and wall targets), M3 (particle-set encoder, stage A), M4 (PFP set, generated track ends on the wall),
 and production-format surrogated datasets for the analysers. Remaining:
 \begin{enumerate}
-\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): a two-stage M2, with one flow over the always-present
-      variables (vertex, scores, longest track), the PFP counts and the group-presence flags, and a second flow
-      for the optional groups conditioned on it and masked by the generated presence.
-\item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
+\item Close the CC1p0pi purity gap (Sec.~\ref{sec:ends}): the two-stage M2 (M2s) closes the CC N$\pi$
+      $n_\mathrm{pfp}$--exit link but breaks the joint PFP counts; with the counts as a one-hot topology class in
+      stage 1 (M2o) the counts are right but the link is lost; with the class from a classifier on the generated
+      stage 1 (M2c) the counts are right and the acceptance equals the shipped chain, the link still missing.
+      The link has two parts: the reco-vertex resolution for true vertices in the FV (core 4--6\,cm generated
+      against 0.5\,cm \real{}), fixed by generating the vertex as the residual to the true vertex (M2v, acceptance
+      unchanged on its own), and the wall relation of the longest track for dirt neutrinos (three fifths of the CC
+      N$\pi$ $n_\mathrm{pfp}=3$ slices), restored by the wall targets (M2w). Combined (M2vw, adopted as the shipped slice
+      generator): 0.188 / 0.400, within the test precision of the previous chain; the background excess ($+194$) is
+      still the slice generator's (CC N$\pi$ $+72$, NC $+42$). The PFP generator loses truth-contained signal through
+      the cathode-side correlation of the track ends (notebook purity 0.35 vs 0.431): the next lever.
+\item Write \texttt{surrogate\_official\_m2vw\_pfp} for all 2,000 jobs once reviewed; then retire
+      \texttt{surrogate\_official\_m3\_pfp}.
+\item Split every table by a hash of the file id (Sec.~\ref{sec:data}) and retrain the chain on it, so that the
+      cardinality head and all future tables share the held-out files.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and
       M2 generate them as independent numbers and smear the sharp range peak of stopping pions
       (Fig.~\ref{fig:m1two}; M2 peak fraction 0.17 against 0.22). M2t flags them on the curve and snaps them, but
-      reaches only 72\% on the curve for the pion; to be carried into the two-stage M2, with the M2 version of
-      that figure.
+      reaches only 72\% on the curve for the pion; the two-stage M2s reaches 93\% (\real{} 93\%). To be
+      shipped with the next M2, with the M2 version of that figure.
 \item M4 completeness: induction-plane chi2, PFPs without a fit, PFP truth-match columns.
 \item Cosmic-only and unmatched slices in the surrogated files (taken from the MC).
 \item Uncertainty: Bayesian last layers or ensembles, an out-of-support flag per generated record.
 \item Holdouts: train on $|t|<0.1$, test the tail; low versus high $E_\nu$; forward versus wide-angle muons;
       $\le 2$ versus $\ge 3$ charged primaries; one TPC versus the other.
-\item Collaborators' comparisons (cohpi, kaon, CC1p0pi) on the test files of \texttt{surrogate\_official\_m3w0\_pfp}.
+\item Collaborators' comparisons (cohpi, kaon, CC1p0pi) on the test files of \texttt{surrogate\_official\_m2vw\_pfp}.
 \end{enumerate}
 
 \end{document}

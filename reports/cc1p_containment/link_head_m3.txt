@@ -1,0 +1,12 @@
+link with truth-predicted exit: real n3 +0.035 | gen n3 +0.018 | shipped MLP head P(n3|truth) +0.013 | GBDT P(n3|truth) fit on real +0.021
+binary n3 logloss on real test: MLP head 0.2880  GBDT 0.2985  marginal 0.3702
+P(n_pfp=3 | p_mu tercile, cosz tercile): real / gen / MLP head   (rows p_mu low->high, cols cosz low->high)
+   p_mu 0.08-0.32 | 0.111/0.112/0.116  0.131/0.125/0.129  0.145/0.150/0.147
+   p_mu 0.32-0.63 | 0.095/0.100/0.093  0.103/0.097/0.101  0.172/0.129/0.144
+   p_mu 0.63-5.72 | 0.067/0.096/0.080  0.114/0.096/0.091  0.138/0.121/0.115
+P(n3 | truth-predicted exit probability bin): real / gen / MLP
+   P(exit) 0.01-0.12  0.104 / 0.099 / 0.106   n 2451
+   P(exit) 0.12-0.34  0.091 / 0.094 / 0.096   n 2451
+   P(exit) 0.34-0.62  0.153 / 0.142 / 0.137   n 2450
+   P(exit) 0.62-0.90  0.164 / 0.127 / 0.127   n 2451
+   P(exit) 0.90-0.99  0.096 / 0.101 / 0.096   n 2451

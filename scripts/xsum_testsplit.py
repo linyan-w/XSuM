@@ -2,7 +2,9 @@
 """Load XSuM real and surrogate dataframes restricted to the TEST files (input flat CAFs never used in training).
 
 The train/val/test split is by input flat CAF: a row belongs to the test sample if its (job number, __ntuple)
-pair is labelled "test" in file_splits.parquet. Job number N is the number in the file name
+pair is labelled "test" in file_splits.parquet (one copy at the top of the dataframe area, written by XSuM's
+scripts/make_file_splits.py from the generators' training table: the test files are the files no generator saw;
+the per-dataset copies are identical). Job number N is the number in the file name
 (real: xsum_v10_14_02_03_N.df, surrogate: xsum_surrogate_N.df); __ntuple is the first index level of every table.
 
 Usage as a library:
@@ -26,8 +28,8 @@ import pandas as pd
 BASE = "/pnfs/sbnd/persistent/users/lwan/dataframe"
 REAL = f"{BASE}/prod_v10_14_02_03_official/xsum_v10_14_02_03_{{n}}.df"
 REAL_SLC = f"{BASE}/prod_v10_14_02_03_official_slcfix/xsum_v10_14_02_03_{{n}}.df"   # slc must come from here (repaired)
-SURR = f"{BASE}/surrogate_official_v3_pfp/xsum_surrogate_{{n}}.df"
-SPLITS = f"{BASE}/surrogate_official_v3_pfp/file_splits.parquet"
+SURR = f"{BASE}/surrogate_official_m2vw_pfp/xsum_surrogate_{{n}}.df"   # shipped chain; scripts override via ts.SURR
+SPLITS = f"{BASE}/file_splits.parquet"   # one copy at the top level: the split is identical for every surrogate dataset
 
 _splits = None
 

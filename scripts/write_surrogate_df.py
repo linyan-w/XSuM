@@ -6,7 +6,8 @@ For every production chunk file <dir>/xsum_*_chunk<N>.df it writes <out dir>/xsu
 truth tables (mcnu, mcprim, hdr, histpotdf, histgenevtdf, pot) copied from the production and the `slc` table
 replaced by the generated slices (index __ntuple, entry, rec.slc..index; tmatch_idx = generating neutrino,
 tmatch_eff/purity NaN, selection flags recomputed). It also writes <out dir>/file_splits.parquet with the
-train/val/test assignment of every input file, so comparisons with the real chain can be restricted to test files.
+train/val/test assignment of every input file, so comparisons with the real chain can be restricted to test files;
+the table is a copy of --split-table, written by scripts/make_file_splits.py from the generators' training table (xsum.data.splits).
 """
 import argparse
 import glob
@@ -16,7 +17,6 @@ import re
 import numpy as np
 import pandas as pd
 
-from xsum.data.splits import split_by_level
 from xsum.io.xsum_df import chunk_id, read_table
 
 SLC_ORDER = ["is_fv", "bcfm_score", "nu_score", "is_not_clear_cosmic", "n_pfp", "n_prong", "n_trk", "n_proton", "n_shower",
@@ -39,7 +39,7 @@ def in_fv_nohiyz(x, y, z):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("generated"); ap.add_argument("prod_dir"); ap.add_argument("out_dir"); ap.add_argument("--chunks", nargs="*", type=int, default=None)
-    ap.add_argument("--features", default=None, help="features.parquet of the full table, for the file-split table (default: derived from the generated index)")
+    ap.add_argument("--split-table", required=True, help="file_splits.parquet from scripts/make_file_splits.py (the generators' train/val/test files), copied into the dataset")
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--pfp", default=None, help="generated pfp parquet (generate_pfp.py); replaces the copied pfp table")
     a = ap.parse_args()
@@ -47,16 +47,8 @@ def main():
     G = pd.read_parquet(a.generated)
     files = sorted(glob.glob(f"{a.prod_dir}/xsum_*.df"), key=chunk_id)
     files = [f for f in files if a.chunks is None or chunk_id(f) in a.chunks]
-    # file-level split table (same rule and seed as training)
-    if a.features:
-        idx = pd.read_parquet(a.features, columns=[]).index
-    else:
-        idx = G.index
-    fid = idx.get_level_values("chunk").to_numpy() * 100000 + idx.get_level_values("__ntuple").to_numpy()
-    sp = split_by_level(pd.MultiIndex.from_arrays([fid], names=["file"]), level="file", seed=0)
-    lab = np.where(sp["train"], "train", np.where(sp["val"], "val", "test"))
-    splits = pd.DataFrame({"chunk": idx.get_level_values("chunk"), "__ntuple": idx.get_level_values("__ntuple"), "split": lab}).drop_duplicates()
-    splits.to_parquet(f"{a.out_dir}/file_splits.parquet", index=False)
+    # file-level split table: the generators' split, precomputed (see xsum.data.splits.file_split_table)
+    pd.read_parquet(a.split_table).to_parquet(f"{a.out_dir}/file_splits.parquet", index=False)
     PF = pd.read_parquet(a.pfp) if a.pfp else None
     from concurrent.futures import ProcessPoolExecutor
     with ProcessPoolExecutor(a.workers) as ex:
