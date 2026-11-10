@@ -9,7 +9,7 @@
     .h{font-weight:bold;font-size:14px}.s{font-size:11.5px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}
   </style>
 
-  <text x="20" y="28" class="h" font-size="17">XSuM as shipped (surrogate_official_m3w0_pfp, 2026-11-09): inputs, models, generated tables</text>
+  <text x="20" y="28" class="h" font-size="17">XSuM as shipped (surrogate_official_m2vw_pfp, 2026-11-09): inputs, models, generated tables</text>
   <text x="20" y="48" class="cap">one true neutrino interaction in, its reconstructed record out; tables are the XSuM cafpyana dataframes (mcnu, mcprim, mcdaught, slc, pfp)</text>
 
   <!-- INPUTS -->
@@ -54,10 +54,11 @@
   <text x="362" y="292" class="s">   spheres, muon / pion-candidate containment flags,</text>
   <text x="362" y="308" class="s">   point masses (vertex at walls, back-to-back pairs)</text>
 
-  <rect x="350" y="336" width="390" height="68" class="box model"/>
+  <rect x="350" y="336" width="390" height="76" class="box model"/>
   <text x="362" y="356" class="h">Slice generator, step 2: slice values  (~50 numbers)</text>
-  <text x="362" y="374" class="s">conditional flow matching, MLP 6 x 1024, masked per event to</text>
-  <text x="362" y="390" class="s">the groups that exist; conditioned on features, z, topology</text>
+  <text x="362" y="373" class="s">conditional flow matching, MLP 6 x 1024, masked per event to the</text>
+  <text x="362" y="388" class="s">groups that exist; conditioned on features, z, topology; vertex as the</text>
+  <text x="362" y="403" class="s">residual to the true vertex; wall flag + offset on lengths and end points</text>
 
   <rect x="350" y="416" width="390" height="100" class="box model"/>
   <text x="362" y="436" class="h">PFP generator: the PFP set of each slice   (code m4)</text>
