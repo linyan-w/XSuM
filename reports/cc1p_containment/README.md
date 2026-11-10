@@ -345,3 +345,57 @@ vs 0.042; hybrid 0.037): given both ends in the FV, real has the vertex and ends
 the generated end keeps the cathode side. The same correlation loss gives the signal containment 0.854 vs 0.986
 (longest end out of FV 0.092, wrong cathode side 0.036). This is the notebook-purity gap (0.431 vs 0.35) and the
 largest lever left in M4.
+
+## M2vw adopted as the shipped slice generator (run `m2_official_m2vw`), 2026-11-09
+
+Decision: M2vw replaces `m2_official_m3`. The vertex resolution is right (the previous run was 10x too wide), the
+wall marginals of the slice block match real (length at the path 0.161 vs 0.145; muon end on the wall 0.433 vs 0.429;
+muon end outside the TPC 0.000 vs 0.001), and every acceptance stage is at least as close to real as before; cost:
+per-column relative W1 0.0073 -> 0.0091 (< 1% of the range). Before shipping, `apply_walls` was completed
+(`xsum/train/m2.py`, `tests/test_walls.py`): a flagged end's offset is clipped to the wall band (3-7% of flagged
+ends fell outside), and an unflagged end beyond the band (2% per axis, up to tens of cm; real has none) is mirrored
+back inside about the wall plane. The slices and PFPs were regenerated with the fix (the CC1p0pi cuts use the PFP
+track ends, not the cohpi end columns); the result files of the first pass are kept with the suffix `_noclip`.
+
+Held-out split (see the next section; `accept_m2vw.txt`, `accept_m3w0.txt`, `diag_*_summary.txt`, `topo_*.txt`):
+
+| 2prong-contained, held-out | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,555 | 0.197 / 0.425 | 0.623 / 0.418 | 0.109 / 0.885 |
+| M3w0 (previous slice generator) | 3,720 | 0.193 / 0.398 | 0.537 / 0.344 | 0.108 / 0.875 |
+| M2vw (shipped) | 3,654 | 0.192 / 0.403 | 0.538 / 0.351 | 0.113 / 0.869 |
+
+The gap is -0.022 (previous -0.027); background excess +137 (previous +196), signal -38 (-31). M2vw is nearer real
+at every stage: selected / real 1.006 vs 1.012 at the vertex cut, 1.004 vs 1.012 at nu_score, 1.028 vs 1.046 at
+2prong-contained; overlap of the selected events at the last stage 0.404 vs 0.382. The held-out closure equals the
+in-sample one within statistics (in-sample gap -0.035 / -0.041): the generators do not overfit their training files.
+
+Datasets on /pnfs after the clean-up: `surrogate_official_m2vw_pfp` (jobs 0-199, the shipped chain; pass 2 on
+approval), `surrogate_official_m3_pfp` (2,000 jobs, previous slice and PFP generators; kept until pass 2 exists).
+Deleted: `surrogate_official_v3`, `surrogate_official_v3_pfp` (superseded, 150 GB) and `surrogate_official_m3w0_pfp`
+(the previous shipped chain, jobs 0-199). The shared loader `dataframe/xsum_testsplit.py` now reads the split from
+`dataframe/file_splits.parquet` (one copy, identical in every dataset) and defaults to the shipped dataset.
+
+## The datasets' test split was not the generators' held-out split, 2026-11-09
+
+Found while reinstalling the split file: `split_by_level` is a seeded shuffle of the *sorted file list*, so the
+assignment depends on the whole list. The M3 encoder, the M2 flow and M4 are trained on the matched table
+(745,363 files, test 74,537) and share one split, but the M2 cardinality head uses the 4M-row card table (740,304
+files) and `write_surrogate_df.py` derived each dataset's `file_splits.parquet` from the generated index (745,350
+files for the m3-era datasets, a different list again for v3). Different lists give unrelated assignments: the test
+sets of the models and of the datasets overlap at 10-20%, and 71% of the datasets' "test" files (52,949 of 74,535)
+are files the generators trained on. Every acceptance and diagnostic number above (shipped, hybrid, M2w, M2t, M2s,
+M2o, M2c, M2v, M2vw) was therefore computed on a sample that is mostly in-sample for M2 and M4 (and the v3-era
+`file_splits.parquet` of `surrogate_official_v3_pfp`, which the loader read until today, was yet another random
+10%; the first regenerated-M2vw run, which read the m3-era copy, gave 0.190 / 0.404 against real 0.195 / 0.434 for
+that reason). The comparisons between variants stand (same sample for all), the absolute closure does not.
+
+Fix (no retraining): `xsum.data.splits.file_split_table` derives the split table from the generators' training
+table (`table_matched_m3`; the 240 files with neutrinos but no matched slice are labelled test), written once by
+`scripts/make_file_splits.py` to `data/prod_v10_14_02_03_official/file_splits.parquet` and installed as
+`/pnfs/.../dataframe/file_splits.parquet` (read by the loader) and in every dataset directory;
+`write_surrogate_df.py` now copies it (`--split-table`, required). The held-out sample of jobs 0-199 has 7,516 files
+and 179,759 neutrinos, the same size as before. The M2 cardinality head remains trained on 90% of these files (it
+decides only whether a neutrino gets a slice); the next training round should split by a hash of the file id so that
+every table shares the assignment. Results on the held-out split: `accept_m2vw.txt`, `accept_m3w0.txt` (the
+in-sample files are kept as `*_noclip` / `*_v3split`).

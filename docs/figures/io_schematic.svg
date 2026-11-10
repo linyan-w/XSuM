@@ -127,6 +127,6 @@
   <text x="32" y="704" class="s">SBND 2026 gen2 BNB + cosmics CV, v10_14_02_03: official SAM definition, 749,262 flat CAFs, 9.94 M events, processed as 2,000 grid jobs</text>
   <text x="32" y="720" class="s">by a selection-free cafpyana configuration: 17.9 M true neutrinos, 5.74 M truth-matched slices. Split 80 / 10 / 10 by input file (never by row).</text>
   <text x="32" y="736" class="s">Slice and PFP generators trained on 3 M sampled training slices each (RTX 3090). Generated for all neutrinos: 5.92 M slices, 14.06 M PFPs.</text>
-  <text x="32" y="756" class="s">Datasets: /pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_official_m3w0_pfp/ (jobs 0-199 so far), surrogate_official_m3_pfp/ (2,000 files, previous PFP generator).</text>
-  <text x="32" y="772" class="s">Shipped runs: encoder m3 (v1 inputs); slice generator m2_official_m3; PFP generator m4_official_m3w0 (generated track ends, wall flag, no particle attention).</text>
+  <text x="32" y="756" class="s">Datasets: /pnfs/sbnd/persistent/users/lwan/dataframe/surrogate_official_m2vw_pfp/ (jobs 0-199 so far), surrogate_official_m3_pfp/ (2,000 files, previous slice and PFP generators).</text>
+  <text x="32" y="772" class="s">Shipped runs: encoder m3 (v1 inputs); slice generator m2_official_m2vw (vertex as the residual to the true vertex, wall flags); PFP generator m4_official_m3w0 (generated track ends, wall flag, no particle attention).</text>
 </svg>

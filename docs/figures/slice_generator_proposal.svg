@@ -3,9 +3,9 @@
 <defs><marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker></defs>
 <style>.box{stroke:#444;stroke-width:1.2;rx:6}.in{fill:#e3f0fb}.model{fill:#fdf1dc}.rule{fill:#ececec}.res{fill:#fff}.prop{fill:#fffbe6}
 .h{font-weight:bold;font-size:14px}.b{font-weight:bold;font-size:12px}.s{font-size:11px;fill:#333}.cap{font-size:12px;fill:#555;font-style:italic}</style>
-<text x="20" y="28" class="h" font-size="17">Slice generator: the shipped scheme, the three two-stage variants, the vertex-residual variant and the combined variant tried   (2026-11-09)</text>
+<text x="20" y="28" class="h" font-size="17">Slice generator: the previous shipped scheme, the three two-stage variants, the vertex-residual variant and the combined variant, adopted   (2026-11-09)</text>
 <text x="20" y="48" class="cap">Each row generates one slice record from the truth; the PFP generator (unchanged, run m4_official_m3w0) then builds the PFP set from it. Numbers: CC1p0pi acceptance on test jobs 0-199.</text>
-<text x="20" y="78" class="h">1. Shipped slice generator  (run m2_official_m3)</text>
+<text x="20" y="78" class="h">1. Previous shipped slice generator  (run m2_official_m3, shipped until 2026-11-09)</text>
 <rect x="20" y="88" width="140" height="158" class="box in"/>
 <text x="30" y="106" class="b">Truth input</text>
 <text x="30" y="124" class="s">80 summary features</text>
@@ -196,7 +196,7 @@
 <text x="870" y="1019" class="s">slices): P(exit | reco vertex in FV) real 0.75, gen 0.55;</text>
 <text x="870" y="1034" class="s">exiting tracks end on the wall 0.51 real, 0.23 gen</text>
 <text x="870" y="1049" class="s">(M2w with wall targets: 0.51). Combined: row 6.</text>
-<text x="20" y="1103" class="h">6. Variant E tried  (run m2vw): row 5 + the wall targets of M2w (longest-track length vs path to wall, cohpi end points: flag + offset, snapped)</text>
+<text x="20" y="1103" class="h">6. Adopted: the shipped slice generator  (run m2_official_m2vw, 2026-11-09): row 5 + the wall targets of M2w (longest-track length vs path to wall, cohpi end points: flag + offset, snapped)</text>
 <rect x="20" y="1113" width="140" height="158" class="box in"/>
 <text x="30" y="1131" class="b">Truth input</text>
 <text x="30" y="1149" class="s">as row 5</text>
@@ -219,7 +219,7 @@
 <line x1="835" y1="1191" x2="860" y2="1191" stroke="#444" stroke-width="1.4" marker-end="url(#arr)"/>
 <rect x="860" y="1113" width="300" height="158" class="box res"/>
 <text x="870" y="1131" class="b">Result: both zones move, purity 0.400 (eff 0.188)</text>
-<text x="870" y="1149" class="s">= shipped within the test precision (+-0.008).</text>
+<text x="870" y="1149" class="s">held-out split: 0.403 vs previous 0.398 (real 0.425); adopted.</text>
 <text x="870" y="1164" class="s">Dirt: P(exit | reco vertex in FV) 0.63 (real 0.75, M2v 0.55);</text>
 <text x="870" y="1179" class="s">M2-level link +0.011 (real +0.025); CC Npi at n_pfp = 3,</text>
 <text x="870" y="1194" class="s">longest end in FV 0.476 (real 0.439, shipped 0.49).</text>

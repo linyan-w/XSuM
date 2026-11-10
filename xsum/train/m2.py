@@ -127,11 +127,20 @@ def apply_walls(df):
     path = path_to_wall(df[["vtx_x", "vtx_y", "vtx_z"]].to_numpy(np.float64), df[["long_dirx", "long_diry", "long_dirz"]].to_numpy(np.float64))
     with np.errstate(invalid="ignore", over="ignore"): new = path * (1 + np.nan_to_num(df["long_woff"].to_numpy(np.float64), nan=0.0))
     df["long_trk_len"] = np.where(on & np.isfinite(new) & (new > 0), new, df["long_trk_len"].to_numpy())
+    from ..prep.pfpset import WALL_BAND
     for p in ("muon", "cpi"):
         for a in "xyz":
             on = df[f"{p}_end_wall_{a}"].to_numpy() > 0.5; e = df[f"{p}_end_{a}"].to_numpy(np.float64)
-            lo, hi = WALL_REF[a]; off = np.nan_to_num(df[f"{p}_end_woff_{a}"].to_numpy(np.float64), nan=0.0)
-            df[f"{p}_end_{a}"] = np.where(on & np.isfinite(e), np.where(e > 0.5 * (lo + hi), hi + off, lo - off), e)
+            lo, hi = WALL_REF[a]; (bl, bh) = WALL_BAND[a]
+            # the generated offset of a flagged end is kept within the wall band (3-7% of the flagged ends fall outside)
+            off = np.clip(np.nan_to_num(df[f"{p}_end_woff_{a}"].to_numpy(np.float64), nan=0.0), bl, bh)
+            e = np.where(on & np.isfinite(e), np.where(e > 0.5 * (lo + hi), hi + off, lo - off), e)
+            # unflagged ends beyond the wall band (real: none; generated: ~2% per axis, up to tens of cm) are
+            # mirrored back inside about the wall plane, so the value stays within the active volume
+            upper = e > 0.5 * (lo + hi); beyond = np.where(upper, e - hi, lo - e)
+            fix = ~on & np.isfinite(e) & (beyond > bh)
+            e = np.where(fix, np.clip(np.where(upper, 2 * hi - e, 2 * lo - e), lo, hi), e)
+            df[f"{p}_end_{a}"] = e
     return df
 
 
@@ -405,7 +414,9 @@ def run(table_dir, out_dir, device="cuda", epochs=30, seed=0, max_rows=None, hid
         topo_last=False, range_curve=False, two_stage=False, topo_onehot=False, topo_cls=False, vtx_resid=False):
     """card_table: optional directory with features/targets (matched, n_matched_slices) for the cardinality head;
     then table_dir is expected to hold matched slices only (see scripts/split_official_table.py).
-    Defaults = the shipped M2 (m2_official_m3). Studies (technote Sec. 8): walls (M2w), topo_last + range_curve (M2t).
+    Shipped M2 (m2_official_m2vw, 2026-11-09) = defaults + vtx_resid + walls; the defaults alone are the previous shipped
+    run m2_official_m3. Studies (technote Sec. 8): walls alone (M2w), vtx_resid alone (M2v), topo_last + range_curve (M2t).
+    vtx_resid: the reco vertex generated as asinh((reco - true) / 1 cm) and added back to the true vertex at generation.
     walls: wall flag / offset targets for the longest-track length and the cohpi end points (WALL_SPEC, apply_walls).
     topo_last: the topology class (joint PFP counts) is sampled AFTER the flow, from the truth features and the
     generated slice block, so that counts follow the generated tracks (e.g. an exiting longest track <-> fewer PFPs);
