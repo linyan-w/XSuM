@@ -306,3 +306,42 @@ muon from a mid-track vertex ends on the wall), which the wall targets of M2w re
 acceptance (0.185 / 0.390) did not improve because its vertex core was still 4-6 cm and its per-event wall assignment
 was 0.56 (above). The two fixes act on different zones (vertex residual: true vertex in FV; wall targets: dirt) and
 have not been combined. Next, if approved: M2v + `--walls` (the shipped configuration with both), M2vw.
+
+## M2vw: vertex residual + wall targets (`--vtx-resid --walls`; `accept_m2vw.txt`, `diag_m2vw_summary.txt`, `m2_purity_m2vw.txt`, `topo_m2vw.txt`, `link_m2vw.txt`, `vtx_dir_m2vw.txt`, `vtx_dirt_m2vw.txt`, `contain_joint_m2vw.txt`), 2026-11-09
+
+The shipped configuration with both fixes (run `m2_official_m2vw`, `pipeline_m2vw.sh`, PFPs from M3w0, dataset
+`surrogate_official_m2vw_pfp`, jobs 0-199).
+
+| 2prong-contained | selected | primary eff / pur | notebook eff / pur | final primary eff / pur |
+|---|---|---|---|---|
+| real | 3,500 | 0.198 / 0.435 | 0.626 / 0.431 | 0.109 / 0.895 |
+| M3w0 (shipped) | 3,725 | 0.191 / 0.394 | 0.531 / 0.343 | 0.106 / 0.872 |
+| M2v | 3,741 | 0.193 / 0.397 | 0.538 / 0.346 | 0.105 / 0.859 |
+| M2vw | 3,617 | 0.188 / 0.400 | 0.524 / 0.349 | 0.106 / 0.861 |
+
+A small gain, within the statistical precision of the test sample (purity +-0.008). Both zones of the link moved
+towards real: true vertex in FV, reco FV pass by exit 0.960 / 0.969 (real 0.975 / 0.958; M2v 0.950 / 0.967); dirt
+zone P(reco vertex in FV | exit / contained) 0.248 / 0.166 (real 0.296 / 0.112; M2v 0.250 / 0.190; M2w 0.281 / 0.178),
+P(exit | reco vertex in FV) 0.627 (real 0.750, M2v 0.552, M2w 0.686), exiting dirt tracks with length = path to the
+wall within 5%: 0.466 (real 0.510). The M2-level link is +0.011 (real +0.025; shipped +0.010, M2v +0.012); the chain
+CC Npi n_pfp=3 longest-end-in-FV fraction 0.476 (real 0.439; shipped 0.49, M2v 0.502, M2w 0.491). Wall marginals as
+M2w (length at the path 0.163 vs 0.142 real).
+
+Decomposition of the primary purity gap (0.435 -> 0.400), from the acceptance counts: primary signal selected 1,522
+real vs 1,445 (-77), background 1,978 vs 2,172 (+194). The hybrid (real slices + M3w0 PFPs) has background +31 and
+signal -31 (0.426), so the background excess is the slice generator's and the signal loss the PFP generator's.
+Note on the diagnostic tables (`diag_*_summary.txt` section A): their `signal` is the truth-contained signal, so the
+row `numu CC 1p0pi (any cont.)` contains the primary-signal neutrinos whose true muon or proton leaves the FV. Its
+excess (+188 contained at 2prong) is almost all primary signal reconstructed as contained (190 vs 14 real, from the
+acceptance file), i.e. the PFP generator's end-point leak-in, not background; the truth-contained signal lost is
+-253. The background excess by category is CC Npi +72 (2prong population +8%, contained 0.339 vs 0.273), NC +42,
+CC other 0pi -9, nue -5, plus neutrinos outside the diagnostic's matched table.
+
+Side observation for the PFP generator (`contain_joint_m2vw.txt`): for the CC 1p0pi neutrinos whose true muon or
+proton leaves the FV, the three containment conditions pass at the real rates one by one (longest end in FV 0.224 vs
+0.236; second end 0.888 vs 0.889; same cathode side 0.665 vs 0.674) but their AND is four times too frequent (0.011
+vs 0.042; hybrid 0.037): given both ends in the FV, real has the vertex and ends on one side of the cathode only
+0.064 of the time, generated 0.220. A long muon whose reco end is inside the FV has in real crossed the cathode;
+the generated end keeps the cathode side. The same correlation loss gives the signal containment 0.854 vs 0.986
+(longest end out of FV 0.092, wrong cathode side 0.036). This is the notebook-purity gap (0.431 vs 0.35) and the
+largest lever left in M4.

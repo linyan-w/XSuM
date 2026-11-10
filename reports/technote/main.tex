@@ -508,11 +508,23 @@ generators give 0.25--0.28 / 0.18--0.20 (\texttt{scripts/diag\_m2\_vtx\_dir.py})
 missing is the longest track given the vertex: P(exit | reco vertex in FV) 0.750 \real{}, 0.552 M2v, and \real{}
 exiting tracks have a length equal to the path to the wall within 5\% for 0.51 against 0.23 (M2v), 0.26 (shipped),
 0.51 (M2w, the wall-target variant, \texttt{diag\_m2\_vtx\_dirt.py}). The dirt link is the wall relation of the
-longest track; M2w restores it but kept the 4--6\,cm vertex core. The two fixes act on different zones and have not
-been combined (M2v + wall targets).
+longest track; M2w restores it but kept the 4--6\,cm vertex core.
+
+\paragraph{Both fixes (M2vw).} The shipped configuration with \texttt{--vtx-resid --walls}. Both zones move towards
+\real{}: FV pass by exit 0.960 / 0.969 for true vertices in the FV (\real{} 0.975 / 0.958); dirt P(exit | reco vertex
+in FV) 0.627 (\real{} 0.750, M2v 0.552, M2w 0.686). The M2-level link is $+0.011$ (\real{} $+0.025$), the chain CC
+N$\pi$ exit fraction at $n_\mathrm{pfp}=3$ 0.476 (\real{} 0.439, shipped 0.49), and the acceptance 0.188 / 0.400
+against the shipped 0.191 / 0.394: a gain within the statistical precision of the test sample ($\pm 0.008$). The
+primary purity gap decomposes into background $+194$ (the slice generator: the hybrid with \real{} slices has $+31$)
+and primary signal $-77$ (the PFP generator: truth-contained signal $-253$, truth-uncontained signal reconstructed as
+contained $+176$). The latter is a correlation loss in the PFP end points: for CC 1p0$\pi$ neutrinos whose muon
+leaves the FV, each containment condition passes at the \real{} rate but, given both track ends inside the FV, the
+vertex and ends are on one side of the cathode 0.064 of the time in \real{} and 0.220 generated (the \real{} muon has
+crossed the cathode). It sets the truth-contained (notebook) purity, 0.431 against 0.35, and is the largest lever
+left in M4.
 
 \begin{figure}[h]\centering\includegraphics[width=\textwidth]{slice_generator_proposal.pdf}
-\caption{The slice generator (M2): shipped scheme, the three two-stage variants and the vertex-residual variant tried. Numbers from the
+\caption{The slice generator (M2): shipped scheme, the three two-stage variants, the vertex-residual variant and the combined variant tried. Numbers from the
 CC1p0pi acceptance on test jobs 0--199.}\label{fig:slicegen}\end{figure}
 
 \begin{table}[h]\centering\small
@@ -587,7 +599,9 @@ and production-format surrogated datasets for the analysers. Remaining:
       The link has two parts: the reco-vertex resolution for true vertices in the FV (core 4--6\,cm generated
       against 0.5\,cm \real{}), fixed by generating the vertex as the residual to the true vertex (M2v, acceptance
       unchanged on its own), and the wall relation of the longest track for dirt neutrinos (three fifths of the CC
-      N$\pi$ $n_\mathrm{pfp}=3$ slices), restored by the wall targets (M2w). Next: the two combined.
+      N$\pi$ $n_\mathrm{pfp}=3$ slices), restored by the wall targets (M2w). Combined (M2vw): 0.188 / 0.400, within the test precision of the
+      shipped chain; the background excess ($+194$) is still the slice generator's. The PFP generator loses
+      truth-contained signal through the cathode-side correlation of the track ends (notebook purity 0.35 vs 0.431).
 \item Write \texttt{surrogate\_official\_m3w0\_pfp} for all 2,000 jobs once reviewed.
 \item Range momenta from the generated lengths: \texttt{range\_p\_mu} and \texttt{range\_p\_cpi} are functions of
       \texttt{long\_trk\_len} and \texttt{short\_trk\_len} (97\% / 93\% of \real{} slices within 2\%), yet M1 and
