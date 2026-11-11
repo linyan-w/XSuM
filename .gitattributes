@@ -1,0 +1,5 @@
+reports/m3_official/encoder.pt filter=lfs diff=lfs merge=lfs -text
+reports/m2_official_m2vw/model.pt filter=lfs diff=lfs merge=lfs -text
+reports/m2_official_m2vw/topology_head.pt filter=lfs diff=lfs merge=lfs -text
+reports/m2_official_m2vw/heads.pkl filter=lfs diff=lfs merge=lfs -text
+reports/m4_official_m3w0/model.pt filter=lfs diff=lfs merge=lfs -text
